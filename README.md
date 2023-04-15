@@ -3,6 +3,5 @@ Auto-balanced binary search tree implementation that works with secondary memory
 
 ## To be implemented:
 
-- Tree balancing (avl)
 - ```remove()``` member function
 - Ordered report of records
