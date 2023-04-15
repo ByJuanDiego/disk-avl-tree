@@ -57,7 +57,7 @@ struct Node {
 
     std::string to_string() {
         std::stringstream ss;
-        ss << "<" << data.to_string() << ", height: " << height << " left: " << left << " right: " << right << ">";
+        ss << "<" << data.to_string() << ", height: " << height << ", left: " << left << ", right: " << right << ">";
         return ss.str();
     }
 

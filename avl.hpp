@@ -36,22 +36,17 @@ private:
 
     long height(long record_pos);
 
-    void update_height(long record_pos, Node &node);
-
-    void balance(long record_pos);
-
-    inline long balancing_factor(long record_pos, Node& node) {
-        file.open(file_name, std::ios::in | std::ios::binary);
-
-        file.seekg(record_pos);
-        file >> node;
-        file.close();
-
+    inline long balancing_factor(Node &node) {
         long lh = this->height(node.left);
         long rh = this->height(node.right);
 
         return lh - rh;
     }
+
+    void update_height(long record_pos, Node &node);
+
+    /// Verifies if a rotation is needed
+    void balance(long record_pos, Node& node);
 
     void right_rotation(long record_pos, Node &node);
 
@@ -79,16 +74,12 @@ public:
 
     void read_all() {
         file.open(file_name, std::ios::in | std::ios::binary);
-
         Node node;
+        long pos = file.tellg();
 
-        while (true) {
-
-            std::cout << file.tellg() << ": ";
-            if (!(file >> node)) {
-                break;
-            }
-            std::cout << node.to_string() << std::endl;
+        while ((file >> node)) {
+            std::cout << "[" << pos << "]:\t" << node.to_string() << std::endl;
+            pos = file.tellg();
         }
 
         file.close();
@@ -115,12 +106,15 @@ Record AVLFile::search(long record_pos, char *value) {
 }
 
 long AVLFile::insert(long record_pos, Record &record) {
+    // Base case: when a null pointer is reached
     if (record_pos == null) {
+        // Create the node and open the file in append mode
         Node node(record);
         file.open(file_name, std::ios::app | std::ios::binary);
         long insertion_position = file.tellp();
         file << node;
         file.close();
+        // Returns the insertion position to the immediate previous state to reassign the physical pointer
         return insertion_position;
     }
 
@@ -136,29 +130,19 @@ long AVLFile::insert(long record_pos, Record &record) {
 
         if (node.left == null) {
             node.left = inserted_pos;
-
-            file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
-            file.seekp(record_pos);
-            file << node;
-            file.close();
         }
     } else if (std::string(record.cod) > std::string(node.data.cod)) {
         inserted_pos = insert(node.right, record);
 
         if (node.right == null) {
             node.right = inserted_pos;
-
-            file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
-            file.seekp(record_pos);
-            file << node;
-            file.close();
         }
     } else {
         throw std::runtime_error("Repeated primary key: " + std::string(record.cod));
     }
 
     update_height(record_pos, node);
-    balance(record_pos);
+    balance(record_pos, node);
     return EXIT_SUCCESS;
 }
 
@@ -180,6 +164,7 @@ long AVLFile::height(long record_pos) {
 }
 
 void AVLFile::update_height(long record_pos, Node &node) {
+    // Calculates the left and right node heights
     long lh = this->height(node.left);
     long rh = this->height(node.right);
 
@@ -193,13 +178,19 @@ void AVLFile::update_height(long record_pos, Node &node) {
     file.close();
 }
 
-void AVLFile::balance(long record_pos) {
-    Node node {};
-    long bf = this->balancing_factor(record_pos, node);
+void AVLFile::balance(long record_pos, Node& node) {
+    long bf = balancing_factor(node);
 
     if (bf >= 2) {
-        Node left_node {};
-        if (balancing_factor(node.left, left_node) <= -1) {
+        Node left_node{};
+
+        // Reads the left node information
+        file.open(file_name, std::ios::in | std::ios::binary);
+        file.seekg(node.left);
+        file >> left_node;
+        file.close();
+
+        if (balancing_factor(left_node) <= -1) {
             left_rotation(node.left, left_node);
         }
         right_rotation(record_pos, node);
@@ -207,7 +198,14 @@ void AVLFile::balance(long record_pos) {
 
     if (bf <= -2) {
         Node right_node{};
-        if (balancing_factor(node.right, right_node) >= 1) {
+
+        // Reads the right node information
+        file.open(file_name, std::ios::in | std::ios::binary);
+        file.seekg(node.right);
+        file >> right_node;
+        file.close();
+
+        if (balancing_factor(right_node) >= 1) {
             right_rotation(node.right, right_node);
         }
         left_rotation(record_pos, node);
