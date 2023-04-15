@@ -1,27 +1,27 @@
-#include "bst_file.hpp"
-
-inline std::string menu_display = "+===========================================+\n"
-                                  "║                                           ║\n"
-                                  "║            __  __                         ║\n"
-                                  "║           |  \\/  |___ _ _ _  _            ║\n"
-                                  "║           | |\\/| / -_) ' \\ || |           ║\n"
-                                  "║           |_|  |_\\___|_||_\\_,_|           ║\n"
-                                  "║                                           ║\n"
-                                  "║                                           ║\n"
-                                  "║     Options:                              ║\n"
-                                  "║                                           ║\n"
-                                  "║     [0]: Insert a record                  ║\n"
-                                  "║     [1]: Search a record                  ║\n"
-                                  "║     [2]: Exit                             ║\n"
-                                  "║                                           ║\n"
-                                  "+===========================================+";
+#include "avl.hpp"
 
 void menu(const std::string &file_name = "./assets/data.dat") {
-    BSTFile bstFile(file_name);
+    AVLFile bstFile(file_name);
     int option;
 
     do {
-        std::cout << menu_display << std::endl;
+        std::cout << "+===========================================+\n"
+                     "║                                           ║\n"
+                     "║            __  __                         ║\n"
+                     "║           |  \\/  |___ _ _ _  _            ║\n"
+                     "║           | |\\/| / -_) ' \\ || |           ║\n"
+                     "║           |_|  |_\\___|_||_\\_,_|           ║\n"
+                     "║                                           ║\n"
+                     "║                                           ║\n"
+                     "║     Options:                              ║\n"
+                     "║                                           ║\n"
+                     "║     [0]: Insert a record                  ║\n"
+                     "║     [1]: Search a record                  ║\n"
+                     "║     [2]: Read the AVL-Tree File           ║\n"
+                     "║     [3]: Exit                             ║\n"
+                     "║                                           ║\n"
+                     "+===========================================+" << std::endl;
+
         std::cout << "Enter option: ";
         std::cin >> option;
 
@@ -47,9 +47,13 @@ void menu(const std::string &file_name = "./assets/data.dat") {
                 std::cout << "Code: ";
                 read_from_console(cod, 5);
 
-                Record record = bstFile.find(cod);
+                Record record = bstFile.search(cod);
                 std::cout << "The record was found: " << record.to_string() << std::endl;
-
+                break;
+            }
+            case 2: {
+                std::cout << std::endl;
+                bstFile.read_all();
                 break;
             }
             default : {
@@ -57,11 +61,14 @@ void menu(const std::string &file_name = "./assets/data.dat") {
             }
         }
 
+        if (option == 2) {
+            std::cin.ignore();
+        }
         std::cout << "\nPress Enter to continue ...";
         std::cin.get();
         std::system(clear_console);
 
-    } while (option == 0 || option == 1);
+    } while (option != 3);
 }
 
 int main() {
