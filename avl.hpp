@@ -50,7 +50,6 @@ private:
         long lh = this->height(node.left);
         long rh = this->height(node.right);
 
-        std::cout << "lh: " << lh << " rh: " << rh << std::endl;
         return lh - rh;
     }
 
@@ -82,7 +81,13 @@ public:
         file.open(file_name, std::ios::in | std::ios::binary);
 
         Node node;
-        while (file >> node) {
+
+        while (true) {
+
+            std::cout << file.tellg() << ": ";
+            if (!(file >> node)) {
+                break;
+            }
             std::cout << node.to_string() << std::endl;
         }
 
@@ -124,7 +129,6 @@ long AVLFile::insert(long record_pos, Record &record) {
     file.seekg(record_pos);
     file >> node;
     file.close();
-    std::cout << node.to_string() << std::endl;
 
     long inserted_pos;
     if (std::string(record.cod) < std::string(node.data.cod)) {
