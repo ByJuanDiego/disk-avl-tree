@@ -116,7 +116,7 @@ private:
             }
         }
 
-        /* Case base (II): If this condition is true, a node with the same key was found. */
+        /* Base case (II): If this condition is true, a node with the same key was found. */
         else {
             if (primary_key) {  //< If the tree is indexing a primary key, an exception is thrown
                 std::stringstream ss;
