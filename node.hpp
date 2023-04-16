@@ -51,6 +51,7 @@ struct Node {
     long left = null;
     long right = null;
     long height = 0;
+    long next = null;
 
     explicit Node() = default;
 
@@ -58,7 +59,7 @@ struct Node {
 
     std::string to_string() {
         std::stringstream ss;
-        ss << "<" << data.to_string() << ", height: " << height << ", left: " << left << ", right: " << right << ">";
+        ss << "<" << data.to_string() << ", height: " << height << ", left: " << left << ", right: " << right << ", next: " << next << ">";
         return ss.str();
     }
 };

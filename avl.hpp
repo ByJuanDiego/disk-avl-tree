@@ -9,13 +9,16 @@
 #include <iostream>
 #include <fstream>
 #include <utility>
+#include <vector>
+
 #include "node.hpp"
 
 template<typename KeyType,
         typename RecordType,
         typename Greater,
         typename Index
-> class AVLFile {
+>
+class AVLFile {
 private:
 
     long root;              //< Physical position of the first node
@@ -24,6 +27,7 @@ private:
     std::string file_name;  //< File name
 
     // Generic behaviour
+    bool primary_key;       //< `True` if indexing a primary key and `false` otherwise
     Index index;            //< Receives a `RecordType` and returns his `KeyType` associated
     Greater greater;        //< Returns `true` if the first parameter is greater than the second and `false` otherwise
 
@@ -32,25 +36,42 @@ private:
      * Recursively descends the tree until the record is found
      *     or a null node is reached; in that case, a exception is thrown
      */
-    RecordType search(long record_pos, KeyType value) {
+    void search(long record_pos, KeyType key, std::vector<Record> &result) {
+        /* Base case (I): If this condition is true, it means that the `key` do not exist. */
         if (record_pos == null) {
             file.close();
             std::stringstream ss;
-            ss << "The record with key: " << value << " do not exists";
+            ss << "The record with key: " << key << " do not exists";
             throw std::runtime_error(ss.str());
         }
 
+        /* Recursion: Searches the node to descend in depth */
         Node<RecordType> node;
         file.seekg(record_pos);
         file >> node;
 
-        if (greater(index(node.data), value)) {
-            return search(node.left, value);
-        } else if (greater(value, index(node.data))) {
-            return search(node.right, value);
+        if (greater(index(node.data), key)) {
+            this->search(node.left, key, result);
+            return;
+        } else if (greater(key, index(node.data))) {
+            this->search(node.right, key, result);
+            return;
         }
 
-        return node.data;
+        /* Base case (II): When this part is reached, it means that the node was found. */
+        result.push_back(node.data);    //< Puts the data in the vector
+
+        if (primary_key) {              //< If the tree is indexing a primary key, algorithm finishes here
+            return;
+        }
+
+        long next = node.next;
+        while (next != null) {          // If not, looks for all the siblings of the node
+            file.seekg(node.next);
+            file >> node;
+            result.push_back(node.data);
+            next = node.next;
+        }
     }
 
     /** Inserts a new record in the disk file
@@ -61,7 +82,7 @@ private:
      * If a record with the same key already exists in the file, a exception is thrown
      */
     long insert(long record_pos, RecordType &record) {
-        // Base case: when a null pointer is reached
+        /* Base case (I): If this condition is true, a place for the new record was found. */
         if (record_pos == null) {
             // Create the node and open the file in append mode
             Node node(record);
@@ -73,6 +94,7 @@ private:
             return insertion_position;
         }
 
+        /* Recursion: Searches the node to descend to insert */
         Node<RecordType> node;
         file.open(file_name, std::ios::in | std::ios::binary);
         file.seekg(record_pos);
@@ -92,10 +114,50 @@ private:
             if (node.right == null) {
                 node.right = inserted_pos;
             }
-        } else {
-            std::stringstream ss;
-            ss << "Repeated primary key: " << index(record);
-            throw std::runtime_error(ss.str());
+        }
+
+        /* Case base (II): If this condition is true, a node with the same key was found. */
+        else {
+            if (primary_key) {  //< If the tree is indexing a primary key, an exception is thrown
+                std::stringstream ss;
+                ss << "Repeated primary key: " << index(record);
+                throw std::runtime_error(ss.str());
+            }
+
+            //< If not, searches the last node to put the new record next to it
+            file.open(file_name, std::ios::in | std::ios::binary);
+            file.seekg(record_pos);
+
+            // Stores the necessary information in each step
+            Node<RecordType> current = node;   //< The current node (initially equals `node`)
+            long next = node.next;             //< His next record physical pointer
+            long pos = file.tellg();           //< The record position
+
+            while (next != null) {
+                file.seekg(next);
+                pos = file.tellg();
+                file >> current;
+                std::cout << current.to_string() << std::endl;
+                next = current.next;
+            }
+            file.close();
+
+            // Append the new record and store the `insertion_pos`
+            file.open(file_name, std::ios::app | std::ios::binary);
+
+            Node<RecordType> insertion_node(record);    //< The node to be inserted
+            long insertion_pos = file.tellp();          //< The position before its insertion
+            file.write((text) &insertion_node, sizeof(Node<RecordType>));
+            file.close();
+
+            current.next = insertion_pos;               //< Assign the last node next pointer to `insertion_pos`
+
+            file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
+            file.seekg(pos);
+            file << current;                            //< Writes the last node new pointer
+            file.close();
+
+            return EXIT_SUCCESS;                        //< Not tree balancing is needed when inserting a repeated key
         }
 
         update_height(record_pos, node);
@@ -221,16 +283,17 @@ private:
 
 public:
 
-    explicit AVLFile(std::string file_name, Index _index, Greater _greater)
-            : file_name(std::move(file_name)), index(_index), greater(_greater) {
+    explicit AVLFile(std::string file_name, bool pk, Index _index, Greater _greater)
+            : file_name(std::move(file_name)), primary_key(pk), index(_index), greater(_greater) {
         file.open(this->file_name, std::ios::app);
         root = (file.tellp() == 0) ? null : initial_record;
         file.close();
     }
 
-    RecordType search(KeyType key) {
+    std::vector<RecordType> search(KeyType key) {
+        std::vector<RecordType> result;
         file.open(file_name, std::ios::in | std::ios::binary);
-        Record result = this->search(root, key);
+        this->search(root, key, result);
         file.close();
         return result;
     }

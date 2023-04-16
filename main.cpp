@@ -4,9 +4,8 @@
 template<typename Greater, typename Index>
 void menu(int key_size, const std::string &key_name, Greater greater, Index index, const std::string &file_name) {
 
-    AVLFile<text, Record, decltype(greater), decltype(index)> bstFile(file_name, index, greater);
+    AVLFile<text, Record, decltype(greater), decltype(index)> bstFile(file_name, false, index, greater);
     std::string command;
-    int option;
     std::cout << "Server [localhost]:" << std::endl;
     std::cout << "Database [cpp]: database" << std::endl;
     std::cout << "Username [cpp]: " << std::endl;
@@ -44,13 +43,18 @@ void menu(int key_size, const std::string &key_name, Greater greater, Index inde
 
             bstFile.insert(record);
             std::cout << "The record with " << key_name << ": " << index(record) << " was successfully inserted\n\n";
+            std::cin.ignore();
         } else if (command == "\\1") {
             char key[key_size];
             std::cout << key_name << ": ";
             read_from_console(key, key_size);
 
-            Record record = bstFile.search(key);
-            std::cout << "The record was found: " << record.to_string() << std::endl << std::endl;
+            std::vector<Record> records = bstFile.search(key);
+            for (Record& record : records) {
+                std::cout << record.to_string() << std::endl;
+            }
+            std::cout << std::endl;
+
         } else if (command == "\\2") {
             bstFile.read_all();
             std::cout << std::endl;
@@ -67,9 +71,9 @@ int main() {
     };
 
     std::function<text(Record &)> index = [=](Record &record) {
-        return record.code;
+        return record.name;
     };
 
-    menu(5, "code", greater, index, "./database/data_indexed_by_code.dat");
+    menu(20, "name", greater, index, "./database/data_indexed_by_name.dat");
     return EXIT_SUCCESS;
 }
