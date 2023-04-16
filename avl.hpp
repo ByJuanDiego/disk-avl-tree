@@ -166,11 +166,11 @@ private:
         }
 
         /*******************************************************************************
-         * AVL behaviour.                                                              *
-         *                                                                             *
-         * Note that both actions below are done recursively while the recursion       *
-         * goes up from the most depth state to the first call.                        *
-         *******************************************************************************/
+        * AVL behaviour.                                                               *
+        *                                                                              *
+        * Note that both actions below are done recursively while the recursion        *
+        * goes up from the most depth state to the first call.                         *
+        ********************************************************************************/
 
         // First updates the height of the current node.
         update_height(record_pos, node);
