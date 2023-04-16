@@ -1,76 +1,64 @@
 #include "avl.hpp"
+#include <iomanip>
 
 template<typename Greater, typename Index>
 void menu(int key_size, const std::string &key_name, Greater greater, Index index, const std::string &file_name) {
 
     AVLFile<text, Record, decltype(greater), decltype(index)> bstFile(file_name, index, greater);
+    std::string command;
     int option;
+    std::cout << "Server [localhost]:" << std::endl;
+    std::cout << "Database [cpp]: database" << std::endl;
+    std::cout << "Username [cpp]: " << std::endl;
+    std::cout << "c++ (17)" << std::endl;
+    std::cout << "Type \"help\" for help" << std::endl << std::endl;
 
     do {
-        std::cout << "+===========================================+\n"
-                     "║                                           ║\n"
-                     "║            __  __                         ║\n"
-                     "║           |  \\/  |___ _ _ _  _            ║\n"
-                     "║           | |\\/| / -_) ' \\ || |           ║\n"
-                     "║           |_|  |_\\___|_||_\\_,_|           ║\n"
-                     "║                                           ║\n"
-                     "║                                           ║\n"
-                     "║     Options:                              ║\n"
-                     "║                                           ║\n"
-                     "║     [0]: Insert a record                  ║\n"
-                     "║     [1]: Search a record                  ║\n"
-                     "║     [2]: Read the AVL-Tree File           ║\n"
-                     "║     [3]: Exit                             ║\n"
-                     "║                                           ║\n"
-                     "+===========================================+" << std::endl;
+        std::cout << "database=# ";
+        std::getline(std::cin, command);
+        std::cin.clear();
 
-        std::cout << "Enter option: ";
-        std::cin >> option;
+        if (command == "help") {
+            std::cout << "Query\n"
+                         "  \\0                 Insert a record\n"
+                         "  \\1                 Search a record\n"
+                         "  \\2                 Read the AVL-Tree File\n\n"
+                         "General\n"
+                         "  \\!cls              Clear screen\n"
+                         "  \\q                 Exit\n\n";
+            continue;
+        } else if (command == "\\q") {
+            break;
+        } else if (command == "\\!cls") {
+            std::system(clear_console);
+        } else if (command == "\\0") {
+            Record record{};
+            std::cout << std::endl << std::endl;
+            std::cout << "------------ Record Information ------------" << std::endl;
+            std::cout << "code: ";
+            read_from_console(record.code, 5);
+            std::cout << "name: ";
+            read_from_console(record.name, 20);
+            std::cout << "cycle: ";
+            std::cin >> record.cycle;
 
-        switch (option) {
-            case 0 : {
-                Record record{};
-                std::cout << std::endl << std::endl;
-                std::cout << "------------ Record Information ------------" << std::endl;
-                std::cout << "Code: ";
-                read_from_console(record.code, 5);
-                std::cout << "Name: ";
-                read_from_console(record.name, 20);
-                std::cout << "Cycle: ";
-                std::cin >> record.cycle;
-                bstFile.insert(record);
-                std::cout << "The record with code: " << record.code << " was successfully inserted" << std::endl;
+            bstFile.insert(record);
+            std::cout << "The record with " << key_name << ": " << index(record) << " was successfully inserted\n\n";
+        } else if (command == "\\1") {
+            char key[key_size];
+            std::cout << key_name << ": ";
+            read_from_console(key, key_size);
 
-                break;
-            }
-            case 1: {
-                char key[key_size];
-                std::cout << std::endl;
-                std::cout << key_name << ": ";
-                read_from_console(key, key_size);
-
-                Record record = bstFile.search(key);
-                std::cout << "The record was found: " << record.to_string() << std::endl;
-                break;
-            }
-            case 2: {
-                std::cout << std::endl;
-                bstFile.read_all();
-                break;
-            }
-            default : {
-                break;
-            }
+            Record record = bstFile.search(key);
+            std::cout << "The record was found: " << record.to_string() << std::endl << std::endl;
+        } else if (command == "\\2") {
+            bstFile.read_all();
+            std::cout << std::endl;
+        } else {
+            std::cout << "ERROR: syntax error at or near " << std::quoted(command) << std::endl;
+            continue;
         }
-
-        if (option == 2) {
-            std::cin.ignore();
-        }
-        std::cout << "\nPress Enter to continue ...";
-        std::cin.get();
-        std::system(clear_console);
-
-    } while (option != 3);
+    } while (true);
 }
 
 int main() {
@@ -79,9 +67,9 @@ int main() {
     };
 
     std::function<text(Record &)> index = [=](Record &record) {
-        return record.name;
+        return record.code;
     };
 
-    menu(20, "Name", greater, index, "./assets/data_indexed_by_name.dat");
+    menu(5, "code", greater, index, "./database/data_indexed_by_code.dat");
     return EXIT_SUCCESS;
 }
