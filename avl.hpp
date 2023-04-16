@@ -32,11 +32,11 @@ private:
     Greater greater;        //< Returns `true` if the first parameter is greater than the second and `false` otherwise
 
     /*******************************************************************************
-    * Finds the record(s) associated to the `key`
-    *
-     * Recursively descends the tree until the record is found
-     * or a null node is reached; in that case, a exception is thrown
-    *******************************************************************************/
+    * Finds the record(s) associated to the `key`                                  *
+    *                                                                              *
+    * Recursively descends the tree until the record is found or a null node       *
+    * is reached; in that case, a exception is thrown                              *
+    ********************************************************************************/
     void search(long record_pos, KeyType key, std::vector<Record> &result) {
         /* Base case (I): If this condition is true, it means that the `key` do not exist. */
         if (record_pos == null) {
