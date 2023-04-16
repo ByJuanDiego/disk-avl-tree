@@ -34,43 +34,45 @@ void read_from_console(char buffer[], int size) {
 }
 
 struct Record {
-    char cod[5];
+    char code[5];
     char name[20];
     int cycle;
 
     std::string to_string() {
         std::stringstream ss;
-        ss << "(" << cod << ", " << name << ", " << cycle << ")";
+        ss << "(" << code << ", " << name << ", " << cycle << ")";
         return ss.str();
     }
 };
 
+template<typename RecordType>
 struct Node {
-    Record data{};
+    RecordType data{};
     long left = null;
     long right = null;
     long height = 0;
 
     explicit Node() = default;
 
-    explicit Node(Record record) : data(record) {}
+    explicit Node(RecordType record) : data(record) {}
 
     std::string to_string() {
         std::stringstream ss;
         ss << "<" << data.to_string() << ", height: " << height << ", left: " << left << ", right: " << right << ">";
         return ss.str();
     }
-
-    friend std::ostream &operator<<(std::ostream &os, Node &node) {
-        os.write((text) &node, sizeof(Node));
-        return os;
-    }
-
-    friend std::istream &operator>>(std::istream &is, Node &node) {
-        is.read((text) &node, sizeof(Node));
-        return is;
-    }
 };
 
+template<typename RecordType>
+std::ostream &operator<<(std::ostream &os, Node<RecordType> &node) {
+    os.write((text) &node, sizeof(Node<RecordType>));
+    return os;
+}
+
+template<typename RecordType>
+std::istream &operator>>(std::istream &is, Node<RecordType> &node) {
+    is.read((text) &node, sizeof(Node<RecordType>));
+    return is;
+}
 
 #endif //AVL_FILE_NODE_HPP

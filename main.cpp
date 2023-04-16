@@ -1,7 +1,9 @@
 #include "avl.hpp"
 
-void menu(const std::string &file_name = "./assets/data.dat") {
-    AVLFile bstFile(file_name);
+template<typename Greater, typename Index>
+void menu(int key_size, const std::string &key_name, Greater greater, Index index, const std::string &file_name) {
+
+    AVLFile<text, Record, decltype(greater), decltype(index)> bstFile(file_name, index, greater);
     int option;
 
     do {
@@ -31,23 +33,23 @@ void menu(const std::string &file_name = "./assets/data.dat") {
                 std::cout << std::endl << std::endl;
                 std::cout << "------------ Record Information ------------" << std::endl;
                 std::cout << "Code: ";
-                read_from_console(record.cod, 5);
+                read_from_console(record.code, 5);
                 std::cout << "Name: ";
                 read_from_console(record.name, 20);
                 std::cout << "Cycle: ";
                 std::cin >> record.cycle;
                 bstFile.insert(record);
-                std::cout << "The record with code: " << record.cod << " was successfully inserted" << std::endl;
+                std::cout << "The record with code: " << record.code << " was successfully inserted" << std::endl;
 
                 break;
             }
             case 1: {
-                char cod[5];
+                char key[key_size];
                 std::cout << std::endl;
-                std::cout << "Code: ";
-                read_from_console(cod, 5);
+                std::cout << key_name << ": ";
+                read_from_console(key, key_size);
 
-                Record record = bstFile.search(cod);
+                Record record = bstFile.search(key);
                 std::cout << "The record was found: " << record.to_string() << std::endl;
                 break;
             }
@@ -72,6 +74,14 @@ void menu(const std::string &file_name = "./assets/data.dat") {
 }
 
 int main() {
-    menu();
+    std::function<bool(text, text)> greater = [](text a, text b) {
+        return std::string(a) > std::string(b);
+    };
+
+    std::function<text(Record &)> index = [=](Record &record) {
+        return record.name;
+    };
+
+    menu(20, "Name", greater, index, "./assets/data_indexed_by_name.dat");
     return EXIT_SUCCESS;
 }
