@@ -13,6 +13,9 @@
     file.seekg(pos, relative);                 \
     file.seekp(pos, relative);
 
+#define DETACH (-2)
+#define NOT_DETACH (-3)
+
 #include <functional>
 #include <iostream>
 #include <fstream>
@@ -48,12 +51,12 @@ private:
     /*******************************************************************************
     * Finds the record(s) associated to the `key`                                  *
     *                                                                              *
-    * Recursively descends the tree until the record is found or a null node       *
+    * Recursively descends the tree until the record is found or a DISK_NULL node       *
     * is reached; in that case, a exception is thrown                              *
     ********************************************************************************/
     void search(long record_pos, KeyType key, std::vector<long> &pointers) {
         /* Base case (I): If this condition is true, it means that the `key` do not exist. */
-        if (record_pos == null) {
+        if (record_pos == DISK_NULL) {
             return;
         }
 
@@ -80,7 +83,7 @@ private:
 
         // If not, looks for all the siblings of the node and includes them in the search.
         long next = node.next;
-        while (next != null) {
+        while (next != DISK_NULL) {
             file.seekg(node.next);
             file >> node;
             pointers.push_back(node.data_pointer);
@@ -91,13 +94,13 @@ private:
     /*******************************************************************************
     * Inserts a new record in the disk file.                                       *
     *                                                                              *
-    * Descends the tree until a null node is reached in order to put the new       *
+    * Descends the tree until a DISK_NULL node is reached in order to put the new       *
     * record information at the end of the file and recursively reassign the       *
     * father physical pointer.                                                     *
     ********************************************************************************/
     long insert(long node_pos, KeyType key, long pointer) {
         /* Base case (I): If this condition is true, a place for the new record was found. */
-        if (node_pos == null) {
+        if (node_pos == DISK_NULL) {
             // Creates the node and open the file in append mode
             Node<KeyType> node(key, pointer);
             SEEK_ALL_RELATIVE(file, 0, std::ios::end)
@@ -116,13 +119,13 @@ private:
         if (greater(node.key, key)) {
             inserted_pos = insert(node.left, key, pointer);
 
-            if (node.left == null) {
+            if (node.left == DISK_NULL) {
                 node.left = inserted_pos;
             }
         } else if (greater(key, node.key)) {
             inserted_pos = insert(node.right, key, pointer);
 
-            if (node.right == null) {
+            if (node.right == DISK_NULL) {
                 node.right = inserted_pos;
             }
         }
@@ -168,9 +171,9 @@ private:
 
     //< Seeks and returns the height of the node located at `record_pos`
     long height(long record_pos) {
-        // If the record position is null, then his height is -1 (empty node)
-        if (record_pos == null) {
-            return null;
+        // If the record position is DISK_NULL, then his height is -1 (empty node)
+        if (record_pos == DISK_NULL) {
+            return -1;
         }
 
         // Reads the node information
@@ -272,92 +275,124 @@ private:
         update_height(node_pos, right);
     }
 
-//    int remove(long record_pos, KeyType key) {
-//        if (record_pos == null) {
-//            std::stringstream ss;
-//            ss << "The record with the key: " << key << " do not exists";
-//            throw std::runtime_error(ss.str());
-//        }
-//
-//        Node<KeyType> node;
-//        file.open(file_name, std::ios::in | std::ios::binary);
-//        file.seekg(record_pos);
-//        file >> node;
-//        file.close();
-//
-//        int reallocate = not_reallocate;
-//        if (greater(index(node.data), key)) {
-//            reallocate = this->remove(node.left, key);
-//            if (reallocate != not_reallocate) {
-//                node.left = reallocate;
-//            }
-//        } else if (greater(key, index(node.data))) {
-//            reallocate = this->remove(node.right, key);
-//            if (reallocate != not_reallocate) {
-//                node.right = reallocate;
-//            }
-//        } else {
-//            if (node.left == null && node.right == null) {
-//                return null;
-//            } else if (node.left != null && node.right == null) {
-//                return node.left;
-//            } else if (node.left == null && node.right != null) {
-//                return node.right;
-//            } else {
-//                Node<KeyType> successor = this->find_successor(node.right);
-//                node.data = successor.data;
-//                node.next = successor.next;
-//                this->remove(node.right, index(successor.data));
-//            }
-//        }
-//
-//        // First updates the height of the current node.
-//        update_height(record_pos, node);
-//        // After ensure the correctness of the subtree nodes heights, `balance` takes place
-//        balance(record_pos, node);
-//        return not_reallocate;
-//    }
+    int remove(long node_pos, KeyType key, std::vector<long> &pointers) {
+        if (node_pos == DISK_NULL) {
+            std::stringstream ss;
+            ss << "The record with the key: " << key << " do not exists";
+            file.close();
+            throw std::runtime_error(ss.str());
+        }
 
-//    Node<KeyType> find_successor(long right_ref) {
-//        Node<KeyType> node;
-//
-//        file.seekg(right_ref);
-//        file >> node;
-//        long leftmost = node.left;
-//
-//        while (leftmost != null) {
-//            file.seekg(leftmost);
-//            file >> node;
-//            leftmost = node.left;
-//        }
-//
-//        return node;
-//    }
+        Node<KeyType> node;
+        SEEK_ALL(file, node_pos)
+        file >> node;
+
+        int reallocate = NOT_DETACH;
+        if (greater(node.key, key)) {
+            reallocate = this->remove(node.left, key, pointers);
+
+            if (reallocate == DETACH) {
+                node.left = DISK_NULL;
+            }
+        } else if (greater(key, node.key)) {
+            reallocate = this->remove(node.right, key, pointers);
+
+            if (reallocate == DETACH) {
+                node.right = DISK_NULL;
+            }
+        } else {
+            if (node.left == DISK_NULL && node.right == DISK_NULL) {
+                return DETACH;
+            } else if (node.left != DISK_NULL && node.right == DISK_NULL) {
+                if (pointers.empty()) {
+                    push_all(node_pos, pointers);
+                }
+
+                Node<KeyType> left_node;
+                SEEK_ALL(file, node.left)
+                file >> left_node;
+                node = left_node;
+                node.left = left_node.left;
+                node.right = left_node.right;
+
+            } else if (node.left == DISK_NULL && node.right != DISK_NULL) {
+                if (pointers.empty()) {
+                    push_all(node_pos, pointers);
+                }
+
+                Node<KeyType> right_node;
+                SEEK_ALL(file, node.right)
+                file >> right_node;
+                node = right_node;
+                node.left = right_node.left;
+                node.right = right_node.right;
+
+            } else {
+                if (pointers.empty()) {
+                    push_all(node_pos, pointers);
+                }
+
+                Node<KeyType> successor = this->find_successor(node.right);
+                reallocate = this->remove(node.right, successor.key, pointers);
+                node = successor;
+                if (reallocate == DETACH) {
+                    node.right = DISK_NULL;
+                }
+            }
+        }
+
+        // First updates the height of the current node.
+        update_height(node_pos, node);
+        // After ensure the correctness of the subtree nodes heights, `balance` takes place
+        balance(node_pos, node);
+
+        return NOT_DETACH;
+    }
+
+    inline void push_all(long node_pos, std::vector<long> &pointers) {
+        while (node_pos != DISK_NULL) {
+            Node<KeyType> current;
+            SEEK_ALL(file, node_pos)
+            file >> current;
+            pointers.push_back(current.data_pointer);
+            if (primary_key) {
+                break;
+            }
+            node_pos = current.next;
+        }
+    }
+
+    Node<KeyType> find_successor(long right_ref) {
+        Node<KeyType> node;
+
+        SEEK_ALL(file, right_ref)
+        file >> node;
+        long leftmost = node.left;
+
+        while (leftmost != DISK_NULL) {
+            file.seekg(leftmost);
+            file >> node;
+            leftmost = node.left;
+        }
+
+        return node;
+    }
 
 public:
 
     // This constructor is used when the structure of the AVL is already build in disk
     AVLFile(std::string index_file_name, Index _index, Greater _greater)
-            : root(null), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
-        file.open(file_name, std::ios::ate);
-        if (file.tellp() == 0) {
-            root = null;
-        } else {
-            root = initial_record;
-            Node<KeyType> node;
-            file.seekg(initial_record);
-            file.read((char *) &node, sizeof(Node<KeyType>));
-            if (node.removed) {
-                root = null;
-            }
-        }
+            : root(DISK_NULL), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+        file.open(file_name, std::ios::app);
+        long size = file.tellp();
         file.close();
+        root = (size == 0) ? DISK_NULL : INITIAL_RECORD;
     }
 
     // This constructor creates the AVL index in disk, `heap_file_name` contains the path to the `crude data` file
     // that stores all the records in a `heap file`.
     explicit AVLFile(const std::string &heap_file_name, std::string index_file_name, Index _index, Greater _greater)
-            : root(null), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+            : root(DISK_NULL), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
         std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
         file.open(file_name, std::ios::out | std::ios::binary);
         file.close();
@@ -375,6 +410,14 @@ public:
     }
 
     ~AVLFile() = default;
+
+    void insert(KeyType key, long pointer) {
+        file.open(file_name, flags);
+        long inserted_position = this->insert(root, key, pointer);
+        file.close();
+
+        root = ((root == DISK_NULL) ? inserted_position : root);
+    }
 
     std::vector<RecordType> search(KeyType key, const std::string &heap_file_name) {
         std::vector<long> pointers;
@@ -400,25 +443,39 @@ public:
         return records;
     }
 
-    void insert(KeyType key, long pointer) {
+    void remove(KeyType key, const std::string &heap_file_name) {
+        std::vector<long> pointers;
         file.open(file_name, flags);
-        long inserted_position = this->insert(root, key, pointer);
+        int detach_root = this->remove(this->root, key, pointers);
         file.close();
 
-        root = ((root == null) ? inserted_position : root);
-    }
+        std::fstream heap_file(heap_file_name, flags);
+        for (long pointer: pointers) {
+            RecordType record{};
+            SEEK_ALL(heap_file, pointer);
+            heap_file.read((char *) &record, sizeof(RecordType));
+            record.removed = true;
+            SEEK_ALL(heap_file, pointer);
+            heap_file.write((char *) &record, sizeof(RecordType));
+        }
+        heap_file.close();
 
-//    void remove(KeyType key) {
-//
-//        int root_removed = this->remove(this->root, key);
-//        root = (root_removed == null) ? null : root;
-//    }
+        if (detach_root == DETACH) {
+            file.open(file_name, std::ios::out);
+            file.close();
+            root = DISK_NULL;
+        }
+    }
 
     void queued_report() {
         file.open(file_name, flags);
         Node<KeyType> input_node;
         file.seekg(0);
-        file >> input_node;
+
+        if (!(file >> input_node)) {
+            std::cout << "No elements to show" << std::endl;
+            return;
+        }
 
         std::queue<std::pair<long, Node<KeyType>>> queue;
         queue.push({0, input_node});
@@ -427,16 +484,16 @@ public:
             auto &[pos, node] = queue.front();
             queue.pop();
 
-            std::cout << "[" << pos << "]:\t" << node.to_string() << std::endl;
+            std::cout << "[" << pos << "]: " << node.to_string() << std::endl;
 
-            if (node.left != null) {
+            if (node.left != DISK_NULL) {
                 file.seekg(node.left);
                 file >> input_node;
                 queue.push({node.left, input_node});
 
             }
 
-            if (node.right != null) {
+            if (node.right != DISK_NULL) {
                 file.seekg(node.right);
                 file >> input_node;
                 queue.push({node.right, input_node});

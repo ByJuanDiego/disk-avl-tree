@@ -9,9 +9,8 @@
 #include <sstream>
 
 /// nullptr file representation
-#define null (-1)
-#define not_reallocate (-2)
-#define initial_record (0)
+#define DISK_NULL (-1)
+#define INITIAL_RECORD (0)
 
 /// Console clear command
 #if defined(_WIN32) || defined(_WIN64)
@@ -32,48 +31,30 @@ void read_from_console(char buffer[], int size) {
     buffer[size - 1] = '\0';
 }
 
-struct MovieRecord {
-    int dataId{};
-    char contentType[16]{'\0'};
-    char title[256]{'\0'};
-    short length{};
-    short releaseYear{};
-    short endYear{};
-    int votes{};
-    float rating{};
-    int gross{};
-    char certificate[16]{'\0'};
-    char description[512]{'\0'};
-    bool removed{};
-
-    std::string to_string() {
-        std::stringstream ss;
-        ss << "("
-           << dataId << ", " << contentType << ", " << title << ", " << length << ", " << releaseYear << ", "
-           << endYear << ", " << votes << ", " << rating << ", " << gross << ", " << certificate
-           << ", " << std::boolalpha << removed << ")";
-        return ss.str();
-    }
-};
-
 template<typename KeyType>
 struct Node {
     KeyType key{};
-    long data_pointer = null;
-    long left = null;
-    long right = null;
+    long data_pointer = DISK_NULL;
+    long left = DISK_NULL;
+    long right = DISK_NULL;
     long height = 0;
-    long next = null;
-    bool removed = false;
+    long next = DISK_NULL;
 
     explicit Node() = default;
 
     explicit Node(KeyType key, long physical_position) : key(key), data_pointer(physical_position) {}
 
+    Node<KeyType> &operator=(const Node<KeyType> &other) {
+        key = other.key;
+        next = other.next;
+        data_pointer = other.data_pointer;
+        return *this;
+    }
+
     std::string to_string() {
         std::stringstream ss;
         ss << "<key: " << key << ", pointer: " << data_pointer << ", height: " << height << ", left: " << left
-           << ", right: " << right << ", next: " << next << ", removed: " << std::boolalpha << removed << ">";
+           << ", right: " << right << ", next: " << next << ">";
         return ss.str();
     }
 };
