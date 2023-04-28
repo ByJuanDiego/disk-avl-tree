@@ -3,5 +3,5 @@ Auto-balanced binary search tree implementation that works with secondary memory
 
 ## To be implemented:
 
-- ```remove()``` member function
 - Ordered report of records
+- Range search
