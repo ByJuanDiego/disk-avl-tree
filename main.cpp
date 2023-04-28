@@ -1,79 +1,59 @@
-#include "avl.hpp"
 #include <iomanip>
+#include <any>
+#include <utility>
 
-template<typename Greater, typename Index>
-void menu(int key_size, const std::string &key_name, Greater greater, Index index, const std::string &file_name) {
+#include "avl.hpp"
 
-    AVLFile<text, Record, decltype(greater), decltype(index)> bstFile(file_name, false, index, greater);
-    std::string command;
-    std::cout << "Server [localhost]:" << std::endl;
-    std::cout << "Database [cpp]: database" << std::endl;
-    std::cout << "Username [cpp]: " << std::endl;
-    std::cout << "c++ (17)" << std::endl;
-    std::cout << "Type \"help\" for help" << std::endl << std::endl;
+class AVLManager {
 
-    do {
-        std::cout << "database=# ";
-        std::getline(std::cin, command);
-        std::cin.clear();
+    std::string heap_file_name;
+    AVLFile<short, MovieRecord, std::function<short(MovieRecord &)>, std::function<bool(short, short)>, false> *avl_indexed_by_release_year = nullptr;
 
-        if (command == "help") {
-            std::cout << "Query\n"
-                         "  \\0                 Insert a record\n"
-                         "  \\1                 Search a record\n"
-                         "  \\2                 Read the AVL-Tree File\n\n"
-                         "General\n"
-                         "  \\!cls              Clear screen\n"
-                         "  \\q                 Exit\n\n";
-            continue;
-        } else if (command == "\\q") {
-            break;
-        } else if (command == "\\!cls") {
-            std::system(clear_console);
-        } else if (command == "\\0") {
-            Record record{};
-            std::cout << std::endl << std::endl;
-            std::cout << "------------ Record Information ------------" << std::endl;
-            std::cout << "code: ";
-            read_from_console(record.code, 5);
-            std::cout << "name: ";
-            read_from_console(record.name, 20);
-            std::cout << "cycle: ";
-            std::cin >> record.cycle;
+public:
 
-            bstFile.insert(record);
-            std::cout << "The record with " << key_name << ": " << index(record) << " was successfully inserted\n\n";
-            std::cin.ignore();
-        } else if (command == "\\1") {
-            char key[key_size];
-            std::cout << key_name << ": ";
-            read_from_console(key, key_size);
+    explicit AVLManager(std::string heap) : heap_file_name(std::move(heap)) {
+    }
 
-            std::vector<Record> records = bstFile.search(key);
-            for (Record& record : records) {
-                std::cout << record.to_string() << std::endl;
-            }
-            std::cout << std::endl;
+    void create_index(const std::string &index_file_name, const std::function<short(MovieRecord &)> &index, const std::function<bool(short, short)> &greater) {
+        avl_indexed_by_release_year = new AVLFile<short, MovieRecord, std::function<short(MovieRecord &)>, std::function<bool(short, short)>, false>(heap_file_name, index_file_name, index, greater);
+    }
 
-        } else if (command == "\\2") {
-            bstFile.read_all();
-            std::cout << std::endl;
-        } else {
-            std::cout << "ERROR: syntax error at or near " << std::quoted(command) << std::endl;
-            continue;
+    void initialize_existing_index(const std::string &index_file_name, const std::function<short(MovieRecord &)> &index, const std::function<bool(short, short)> &greater) {
+        avl_indexed_by_release_year = new AVLFile<short, MovieRecord, std::function<short(MovieRecord &)>, std::function<bool(short, short)>, false>(index_file_name, index, greater);
+    }
+
+    std::vector<MovieRecord> query(short release_year) {
+        if (avl_indexed_by_release_year != nullptr){
+            return avl_indexed_by_release_year->search(release_year, heap_file_name);
         }
-    } while (true);
-}
+
+        return {};
+    }
+
+    void report() {
+        if (avl_indexed_by_release_year != nullptr) {
+            avl_indexed_by_release_year->queued_report();
+        }
+    }
+};
 
 int main() {
-    std::function<bool(text, text)> greater = [](text a, text b) {
-        return std::string(a) > std::string(b);
+    std::function<bool(short, short)> greater = [](short a, short b) {
+        return a > b;
+    };
+    std::function<short(MovieRecord &)> index = [](MovieRecord &record) {
+        return record.releaseYear;
     };
 
-    std::function<text(Record &)> index = [=](Record &record) {
-        return record.name;
-    };
+    AVLManager avl_manager("./database/movies_and_series.dat");
+//    avl_manager.create_index("./database/avl_indexed_by_release_year.dat", index, greater);
+    avl_manager.initialize_existing_index("./database/avl_indexed_by_release_year.dat", index, greater);
+//    avl_manager.report();
 
-    menu(20, "name", greater, index, "./database/data_indexed_by_name.dat");
+    std::vector<MovieRecord> records = avl_manager.query(1892);
+    for (MovieRecord& record : records) {
+        std::cout << record.to_string() << std::endl;
+    }
+    std::cout << "total of records: " << records.size() << std::endl;
     return EXIT_SUCCESS;
 }

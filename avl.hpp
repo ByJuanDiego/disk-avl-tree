@@ -10,13 +10,18 @@
 #include <fstream>
 #include <utility>
 #include <vector>
+#include <queue>
 
 #include "node.hpp"
 
-template<typename KeyType,
+template<
+        typename KeyType,
         typename RecordType,
+
+        typename Index,
         typename Greater,
-        typename Index
+
+        bool primary_key = false       //< Is `true` when indexing a primary key and `false` otherwise
 >
 class AVLFile {
 private:
@@ -26,8 +31,9 @@ private:
     std::fstream file;      //< File object used to manage disk accesses
     std::string file_name;  //< File name
 
+    std::ios_base::openmode flags = (std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+
     /* Generic purposes member variables */
-    bool primary_key;       //< Is `true` when indexing a primary key and `false` otherwise
     Index index;            //< Receives a `RecordType` and returns his `KeyType` associated
     Greater greater;        //< Returns `true` if the first parameter is greater than the second and `false` otherwise
 
@@ -37,7 +43,7 @@ private:
     * Recursively descends the tree until the record is found or a null node       *
     * is reached; in that case, a exception is thrown                              *
     ********************************************************************************/
-    void search(long record_pos, KeyType key, std::vector<Record> &result) {
+    void search(long record_pos, KeyType key, std::vector<long> &pointers) {
         /* Base case (I): If this condition is true, it means that the `key` do not exist. */
         if (record_pos == null) {
             file.close();
@@ -47,20 +53,20 @@ private:
         }
 
         /* Recursion: Searches the node to descend in depth */
-        Node<RecordType> node;
+        Node<KeyType> node;
         file.seekg(record_pos);
         file >> node;
 
-        if (greater(index(node.data), key)) {
-            this->search(node.left, key, result);
+        if (greater(node.key, key)) {
+            this->search(node.left, key, pointers);
             return;
-        } else if (greater(key, index(node.data))) {
-            this->search(node.right, key, result);
+        } else if (greater(key, node.key)) {
+            this->search(node.right, key, pointers);
             return;
         }
 
         /* Base case (II): When this part is reached, it means that the node was found. */
-        result.push_back(node.data); //< Puts the data in the vector
+        pointers.push_back(node.data_pointer); //< Puts the data pointer in the vector
 
         //< If the tree is indexing a primary key, algorithm finishes here.
         if (primary_key) {
@@ -72,7 +78,7 @@ private:
         while (next != null) {
             file.seekg(node.next);
             file >> node;
-            result.push_back(node.data);
+            pointers.push_back(node.data_pointer);
             next = node.next;
         }
     }
@@ -84,11 +90,11 @@ private:
     * record information at the end of the file and recursively reassign the       *
     * father physical pointer.                                                     *
     ********************************************************************************/
-    long insert(long record_pos, RecordType &record) {
+    long insert(long node_pos, KeyType key, long pointer) {
         /* Base case (I): If this condition is true, a place for the new record was found. */
-        if (record_pos == null) {
+        if (node_pos == null) {
             // Creates the node and open the file in append mode
-            Node node(record);
+            Node<KeyType> node(key, pointer);
             file.open(file_name, std::ios::app | std::ios::binary);
             long insertion_position = file.tellp();
             file << node;
@@ -98,21 +104,21 @@ private:
         }
 
         /* Recursion: Searches the node to descend to insert */
-        Node<RecordType> node;
+        Node<KeyType> node;
         file.open(file_name, std::ios::in | std::ios::binary);
-        file.seekg(record_pos);
+        file.seekg(node_pos);
         file >> node;
         file.close();
 
         long inserted_pos;
-        if (greater(index(node.data), index(record))) {
-            inserted_pos = insert(node.left, record);
+        if (greater(node.key, key)) {
+            inserted_pos = insert(node.left, key, pointer);
 
             if (node.left == null) {
                 node.left = inserted_pos;
             }
-        } else if (greater(index(record), index(node.data))) {
-            inserted_pos = insert(node.right, record);
+        } else if (greater(key, node.key)) {
+            inserted_pos = insert(node.right, key, pointer);
 
             if (node.right == null) {
                 node.right = inserted_pos;
@@ -123,43 +129,23 @@ private:
             // If the tree is indexing a primary key, an exception is thrown
             if (primary_key) {
                 std::stringstream ss;
-                ss << "Repeated primary key: " << index(record);
+                ss << "Repeated primary key: " << key;
                 throw std::runtime_error(ss.str());
             }
 
-            // If not, the repeated-key new record is stored at the logical end of the list
-            // of records that shares the same key. However, having this records linked in a
-            // chronological order increases the time complexity of insertion.
-            file.open(file_name, std::ios::in | std::ios::binary);
-            file.seekg(record_pos);
-
-            // Stores the necessary information in each step
-            Node<RecordType> current = node;        //< The current node (initially equals `node`)
-            long next = node.next;                  //< His next record physical pointer
-            long pos = file.tellg();                //< The record position
-
-            // Iterates over the records that shared the same key until the last node is reached
-            while (next != null) {
-                file.seekg(next);
-                pos = file.tellg();
-                file >> current;
-                next = current.next;
-            }
-            file.close();
-
+            // If not, the repeated-key new record is stored next to `node` (LIFO).
             // Append the new record at the end of the file and store the `insertion_pos`
             file.open(file_name, std::ios::app | std::ios::binary);
-
-            Node<RecordType> insertion_node(record);    //< The node to be inserted
+            Node<KeyType> insertion_node(key, pointer); //< The node to be inserted
+            insertion_node.next = node.next;            //< Moves the pointer to the new record node
             long insertion_pos = file.tellp();          //< Stores the position where the new record begins
             file << insertion_node;                     //< Inserts the record
             file.close();
 
-            current.next = insertion_pos;               //< Assign the last node next pointer to `insertion_pos`
-
             file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
-            file.seekg(pos);
-            file << current;                            //< Writes the last node new pointer
+            file.seekg(node_pos);
+            node.next = insertion_pos;                  //< Update the new `next`
+            file << node;                               //< Writes the last node new pointer
             file.close();
 
             return EXIT_SUCCESS;                        //< Not tree balancing is needed when inserting a repeated key
@@ -173,9 +159,9 @@ private:
         ********************************************************************************/
 
         // First updates the height of the current node.
-        update_height(record_pos, node);
+        update_height(node_pos, node);
         // After ensure the correctness of the subtree nodes heights, `balance` takes place
-        balance(record_pos, node);
+        balance(node_pos, node);
 
         return EXIT_SUCCESS; //< After reading this line, the algorithm goes to the previous state
     }
@@ -187,7 +173,7 @@ private:
             return null;
         }
 
-        Node<RecordType> node{};
+        Node<KeyType> node{};
         // Reads the node information
         file.open(file_name, std::ios::in | std::ios::binary);
         file.seekg(record_pos);
@@ -198,7 +184,7 @@ private:
     }
 
     /// Returns the balancing factor of a `node`
-    inline long balancing_factor(Node<RecordType> &node) {
+    inline long balancing_factor(Node<KeyType> &node) {
         long lh = this->height(node.left);
         long rh = this->height(node.right);
 
@@ -206,7 +192,7 @@ private:
     }
 
     /// Updates the `node` height after a new record is inserted in his subtree
-    void update_height(long record_pos, Node<RecordType> &node) {
+    void update_height(long node_pos, Node<KeyType> &node) {
         // Calculates the left and right node heights
         long lh = this->height(node.left);
         long rh = this->height(node.right);
@@ -215,19 +201,19 @@ private:
         node.height = std::max(lh, rh) + 1;
 
         // Overwrites node height in disk
-        file.open(file_name, std::ios::out | std::ios::in | std::ios::binary);
-        file.seekp(record_pos);
+        file.open(file_name, flags);
+        file.seekp(node_pos);
         file << node; //< Updates the height
         file.close();
     }
 
     /// Verifies if a rotation is needed
-    void balance(long record_pos, Node<RecordType> &node) {
+    void balance(long node_pos, Node<KeyType> &node) {
         long bf = balancing_factor(node); //< Calculates the balancing factor
 
         // If the balancing factor is greater or equal than 2, then the tree is unbalanced to the left
         if (bf >= 2) {
-            Node<RecordType> left_node{};
+            Node<KeyType> left_node{};
             file.open(file_name, std::ios::in | std::ios::binary);
             file.seekg(node.left);
             file >> left_node; //< Reads the left node information
@@ -236,12 +222,12 @@ private:
             if (balancing_factor(left_node) <= -1) {
                 left_rotation(node.left, left_node);
             }
-            right_rotation(record_pos, node); //< Makes the right rotation
+            right_rotation(node_pos, node); //< Makes the right rotation
         }
 
         // If the balancing factor is lesser or equal than -2, then the tree is unbalanced to the right
         if (bf <= -2) {
-            Node<RecordType> right_node{};
+            Node<KeyType> right_node{};
             file.open(file_name, std::ios::in | std::ios::binary);
             file.seekg(node.right);
             file >> right_node; //< Reads the right node information
@@ -250,12 +236,12 @@ private:
             if (balancing_factor(right_node) >= 1) {
                 right_rotation(node.right, right_node);
             }
-            left_rotation(record_pos, node); //< Makes the left rotation
+            left_rotation(node_pos, node); //< Makes the left rotation
         }
     }
 
-    void right_rotation(long record_pos, Node<RecordType> &node) {
-        Node<RecordType> left{};
+    void right_rotation(long node_pos, Node<KeyType> &node) {
+        Node<KeyType> left{};
         file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         long l_pos = node.left;
 
@@ -265,18 +251,18 @@ private:
         node.left = left.right;
         left.right = l_pos;
 
-        file.seekp(record_pos);
+        file.seekp(node_pos);
         file << left;
         file.seekp(l_pos);
         file << node;
         file.close();
 
         update_height(l_pos, node);
-        update_height(record_pos, left);
+        update_height(node_pos, left);
     }
 
-    void left_rotation(long record_pos, Node<RecordType> &node) {
-        Node<RecordType> right{};
+    void left_rotation(long node_pos, Node<KeyType> &node) {
+        Node<KeyType> right{};
         file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         long r_pos = node.right;
 
@@ -286,46 +272,181 @@ private:
         node.right = right.left;
         right.left = r_pos;
 
-        file.seekp(record_pos);
+        file.seekp(node_pos);
         file << right;
         file.seekp(r_pos);
         file << node;
         file.close();
 
         update_height(r_pos, node);
-        update_height(record_pos, right);
+        update_height(node_pos, right);
+    }
+
+//    int remove(long record_pos, KeyType key) {
+//        if (record_pos == null) {
+//            std::stringstream ss;
+//            ss << "The record with the key: " << key << " do not exists";
+//            throw std::runtime_error(ss.str());
+//        }
+//
+//        Node<KeyType> node;
+//        file.open(file_name, std::ios::in | std::ios::binary);
+//        file.seekg(record_pos);
+//        file >> node;
+//        file.close();
+//
+//        int reallocate = not_reallocate;
+//        if (greater(index(node.data), key)) {
+//            reallocate = this->remove(node.left, key);
+//            if (reallocate != not_reallocate) {
+//                node.left = reallocate;
+//            }
+//        } else if (greater(key, index(node.data))) {
+//            reallocate = this->remove(node.right, key);
+//            if (reallocate != not_reallocate) {
+//                node.right = reallocate;
+//            }
+//        } else {
+//            if (node.left == null && node.right == null) {
+//                return null;
+//            } else if (node.left != null && node.right == null) {
+//                return node.left;
+//            } else if (node.left == null && node.right != null) {
+//                return node.right;
+//            } else {
+//                Node<KeyType> successor = this->find_successor(node.right);
+//                node.data = successor.data;
+//                node.next = successor.next;
+//                this->remove(node.right, index(successor.data));
+//            }
+//        }
+//
+//        // First updates the height of the current node.
+//        update_height(record_pos, node);
+//        // After ensure the correctness of the subtree nodes heights, `balance` takes place
+//        balance(record_pos, node);
+//        return not_reallocate;
+//    }
+
+    Node<KeyType> find_successor(long right_ref) {
+        Node<KeyType> node;
+
+        file.seekg(right_ref);
+        file >> node;
+        long leftmost = node.left;
+
+        while (leftmost != null) {
+            file.seekg(leftmost);
+            file >> node;
+            leftmost = node.left;
+        }
+
+        return node;
     }
 
 public:
 
-    explicit AVLFile(std::string file_name, bool pk, Index _index, Greater _greater)
-            : file_name(std::move(file_name)), primary_key(pk), index(_index), greater(_greater) {
-        file.open(this->file_name, std::ios::app);
-        root = (file.tellp() == 0) ? null : initial_record;
+    // This constructor is used when the structure of the AVL is already build in disk
+    AVLFile(std::string index_file_name, Index _index, Greater _greater)
+            : root(null), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+        file.open(file_name, std::ios::ate);
+        if (file.tellp() == 0) {
+            root = null;
+        } else {
+            root = initial_record;
+            Node<KeyType> node;
+            file.seekg(initial_record);
+            file.read((char *) &node, sizeof(Node<KeyType>));
+            if (node.removed) {
+                root = null;
+            }
+        }
         file.close();
     }
 
-    std::vector<RecordType> search(KeyType key) {
-        std::vector<RecordType> result;
+    // This constructor creates the AVL index in disk, `heap_file_name` contains the path to the `crude data` file
+    // that stores all the records in a `heap file`.
+    explicit AVLFile(const std::string &heap_file_name, std::string index_file_name, Index _index, Greater _greater)
+            : root(null), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+        file.open(file_name, std::ios::out | std::ios::binary);
+        std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
+        RecordType record;
+
+        long seek = 0;
+        while (heap_file.read((char *) &record, sizeof(RecordType))) {
+            if (!record.removed) {
+                this->insert(index(record), seek);
+            }
+            seek = heap_file.tellg();
+        }
+
+        heap_file.close();
+        file.close();
+    }
+
+    ~AVLFile() = default;
+
+    std::vector<RecordType> search(KeyType key, const std::string &heap_file_name) {
+        std::vector<long> pointers;
         file.open(file_name, std::ios::in | std::ios::binary);
-        this->search(root, key, result);
+        this->search(root, key, pointers);
         file.close();
-        return result;
+
+        std::vector<RecordType> records;
+        records.reserve(pointers.size());
+
+        std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
+        for (long pointer: pointers) {
+            RecordType record;
+            heap_file.seekg(pointer);
+            heap_file.read((char *) &record, sizeof(RecordType));
+            if (record.removed) {
+                continue;
+            }
+            records.push_back(record);
+        }
+
+        heap_file.close();
+        return records;
     }
 
-    void insert(Record &record) {
-        long inserted_position = insert(this->root, record);
+    void insert(KeyType key, long pointer) {
+        long inserted_position = this->insert(this->root, key, pointer);
         root = ((root == null) ? inserted_position : root);
     }
 
-    void read_all() {
-        file.open(file_name, std::ios::in | std::ios::binary);
-        Node<RecordType> node;
-        long pos = file.tellg();
+//    void remove(KeyType key) {
+//        int root_removed = this->remove(this->root, key);
+//        root = (root_removed == null) ? null : root;
+//    }
 
-        while ((file >> node)) {
+    void queued_report() {
+        file.open(file_name, flags);
+        Node<KeyType> input_node;
+        file.seekg(0);
+        file >> input_node;
+
+        std::queue<std::pair<long, Node<KeyType>>> queue;
+        queue.push({0, input_node});
+
+        while (!queue.empty()) {
+            auto &[pos, node] = queue.front();
+            queue.pop();
+
             std::cout << "[" << pos << "]:\t" << node.to_string() << std::endl;
-            pos = file.tellg();
+
+            if (node.left != null) {
+                file.seekg(node.left);
+                file >> input_node;
+                queue.push({node.left, input_node});
+
+            }
+
+            if (node.right != null) {
+                file.seekg(node.right);
+                file >> input_node;
+                queue.push({node.right, input_node});
+            }
         }
 
         file.close();
