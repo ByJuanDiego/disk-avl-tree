@@ -28,16 +28,14 @@
 template<
         typename KeyType,
         typename RecordType,
-
-        typename Index,
-        typename Greater,
-
-        bool primary_key = false       //< Is `true` when indexing a primary key and `false` otherwise
+        typename Index = std::function<KeyType(RecordType &)>,
+        typename Greater = std::greater<KeyType>
 >
 class AVLFile {
 private:
 
     long root;              //< Physical position of the first node
+    bool primary_key;       //< Is `true` when indexing a primary key and `false` otherwise
 
     std::fstream file;      //< File object used to manage disk accesses
     std::string file_name;  //< File name
@@ -129,7 +127,7 @@ private:
                 node.right = inserted_pos;
             }
         }
-        /* Base case (II): If `else` is reached, a node with the same key was found */
+            /* Base case (II): If `else` is reached, a node with the same key was found */
         else {
             // If the tree is indexing a primary key, an exception is thrown
             if (primary_key) {
@@ -380,19 +378,24 @@ private:
 
 public:
 
-    // This constructor is used when the structure of the AVL is already build in disk
-    AVLFile(std::string index_file_name, Index _index, Greater _greater)
-            : root(DISK_NULL), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+    // This constructor creates the AVL index in disk, `heap_file_name` contains the path to the `crude data` file
+    // that stores all the records in a `heap file`.
+    explicit AVLFile(const std::string &heap_file_name, std::string index_file_name,
+                     bool is_key, Index _index, Greater _greater = Greater())
+            : root(DISK_NULL), index(_index),
+              greater(_greater), primary_key(is_key),
+              file_name(std::move(index_file_name)) {
+
+        // Verifies if the index already exists
         file.open(file_name, std::ios::app);
         long size = file.tellp();
         file.close();
-        root = (size == 0) ? DISK_NULL : INITIAL_RECORD;
-    }
+        if (size > 0) {
+            root = INITIAL_RECORD;
+            return;
+        }
 
-    // This constructor creates the AVL index in disk, `heap_file_name` contains the path to the `crude data` file
-    // that stores all the records in a `heap file`.
-    explicit AVLFile(const std::string &heap_file_name, std::string index_file_name, Index _index, Greater _greater)
-            : root(DISK_NULL), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
+        // If not, then creates it
         std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
         file.open(file_name, std::ios::out | std::ios::binary);
         file.close();
@@ -401,7 +404,8 @@ public:
         long seek = 0;
         while (heap_file.read((char *) &record, sizeof(RecordType))) {
             if (!record.removed) {
-                this->insert(index(record), seek);
+                KeyType key = index(record);
+                this->insert(key, seek);
             }
             seek = heap_file.tellg();
         }
@@ -473,8 +477,7 @@ public:
         file.seekg(0);
 
         if (!(file >> input_node)) {
-            std::cout << "No elements to show" << std::endl;
-            return;
+            throw std::runtime_error("No records to display");
         }
 
         std::queue<std::pair<long, Node<KeyType>>> queue;

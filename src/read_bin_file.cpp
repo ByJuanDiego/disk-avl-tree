@@ -12,9 +12,8 @@ int main() {
     std::ifstream file("./database/movies_and_series.dat", std::ios::in | std::ios::binary);
 
     while (file.read((char *) &record, sizeof(MovieRecord))) {
-        if (!record.removed) {
+        if (record.releaseYear == 1874)
             std::cout << record.to_string() << std::endl;
-        }
     }
 
     file.close();
