@@ -5,6 +5,14 @@
 #ifndef AVL_HPP
 #define AVL_HPP
 
+#define SEEK_ALL(file, pos) \
+    file.seekg(pos);        \
+    file.seekp(pos);
+
+#define SEEK_ALL_RELATIVE(file, pos, relative) \
+    file.seekg(pos, relative);                 \
+    file.seekp(pos, relative);
+
 #include <functional>
 #include <iostream>
 #include <fstream>
@@ -31,7 +39,7 @@ private:
     std::fstream file;      //< File object used to manage disk accesses
     std::string file_name;  //< File name
 
-    std::ios_base::openmode flags = (std::ios_base::in | std::ios_base::out | std::ios_base::binary);
+    std::ios_base::openmode flags = (std::ios::out | std::ios::in | std::ios::binary);
 
     /* Generic purposes member variables */
     Index index;            //< Receives a `RecordType` and returns his `KeyType` associated
@@ -46,10 +54,7 @@ private:
     void search(long record_pos, KeyType key, std::vector<long> &pointers) {
         /* Base case (I): If this condition is true, it means that the `key` do not exist. */
         if (record_pos == null) {
-            file.close();
-            std::stringstream ss;
-            ss << "The record with key: " << key << " do not exists";
-            throw std::runtime_error(ss.str());
+            return;
         }
 
         /* Recursion: Searches the node to descend in depth */
@@ -95,20 +100,17 @@ private:
         if (node_pos == null) {
             // Creates the node and open the file in append mode
             Node<KeyType> node(key, pointer);
-            file.open(file_name, std::ios::app | std::ios::binary);
+            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
             long insertion_position = file.tellp();
             file << node;
-            file.close();
             // Returns the insertion position to the immediate previous state to reassign the physical pointer
             return insertion_position;
         }
 
         /* Recursion: Searches the node to descend to insert */
         Node<KeyType> node;
-        file.open(file_name, std::ios::in | std::ios::binary);
-        file.seekg(node_pos);
+        SEEK_ALL(file, node_pos)
         file >> node;
-        file.close();
 
         long inserted_pos;
         if (greater(node.key, key)) {
@@ -130,23 +132,21 @@ private:
             if (primary_key) {
                 std::stringstream ss;
                 ss << "Repeated primary key: " << key;
+                file.close();
                 throw std::runtime_error(ss.str());
             }
 
             // If not, the repeated-key new record is stored next to `node` (LIFO).
             // Append the new record at the end of the file and store the `insertion_pos`
-            file.open(file_name, std::ios::app | std::ios::binary);
+            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
             Node<KeyType> insertion_node(key, pointer); //< The node to be inserted
             insertion_node.next = node.next;            //< Moves the pointer to the new record node
             long insertion_pos = file.tellp();          //< Stores the position where the new record begins
             file << insertion_node;                     //< Inserts the record
-            file.close();
 
-            file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
-            file.seekg(node_pos);
+            SEEK_ALL(file, node_pos)
             node.next = insertion_pos;                  //< Update the new `next`
             file << node;                               //< Writes the last node new pointer
-            file.close();
 
             return EXIT_SUCCESS;                        //< Not tree balancing is needed when inserting a repeated key
         }
@@ -173,12 +173,10 @@ private:
             return null;
         }
 
-        Node<KeyType> node{};
         // Reads the node information
-        file.open(file_name, std::ios::in | std::ios::binary);
-        file.seekg(record_pos);
+        Node<KeyType> node{};
+        SEEK_ALL(file, record_pos);
         file >> node;
-        file.close();
 
         return node.height; //< Returns his height
     }
@@ -201,10 +199,8 @@ private:
         node.height = std::max(lh, rh) + 1;
 
         // Overwrites node height in disk
-        file.open(file_name, flags);
-        file.seekp(node_pos);
+        SEEK_ALL(file, node_pos);
         file << node; //< Updates the height
-        file.close();
     }
 
     /// Verifies if a rotation is needed
@@ -214,10 +210,8 @@ private:
         // If the balancing factor is greater or equal than 2, then the tree is unbalanced to the left
         if (bf >= 2) {
             Node<KeyType> left_node{};
-            file.open(file_name, std::ios::in | std::ios::binary);
-            file.seekg(node.left);
+            SEEK_ALL(file, node.left);
             file >> left_node; //< Reads the left node information
-            file.close();
 
             if (balancing_factor(left_node) <= -1) {
                 left_rotation(node.left, left_node);
@@ -228,10 +222,8 @@ private:
         // If the balancing factor is lesser or equal than -2, then the tree is unbalanced to the right
         if (bf <= -2) {
             Node<KeyType> right_node{};
-            file.open(file_name, std::ios::in | std::ios::binary);
-            file.seekg(node.right);
+            SEEK_ALL(file, node.right);
             file >> right_node; //< Reads the right node information
-            file.close();
 
             if (balancing_factor(right_node) >= 1) {
                 right_rotation(node.right, right_node);
@@ -242,20 +234,19 @@ private:
 
     void right_rotation(long node_pos, Node<KeyType> &node) {
         Node<KeyType> left{};
-        file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         long l_pos = node.left;
 
-        file.seekg(l_pos);
+        SEEK_ALL(file, l_pos);
         file >> left;
 
         node.left = left.right;
         left.right = l_pos;
 
-        file.seekp(node_pos);
+        SEEK_ALL(file, node_pos);
         file << left;
-        file.seekp(l_pos);
+
+        SEEK_ALL(file, l_pos);
         file << node;
-        file.close();
 
         update_height(l_pos, node);
         update_height(node_pos, left);
@@ -263,20 +254,19 @@ private:
 
     void left_rotation(long node_pos, Node<KeyType> &node) {
         Node<KeyType> right{};
-        file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         long r_pos = node.right;
 
-        file.seekg(r_pos);
+        SEEK_ALL(file, r_pos);
         file >> right;
 
         node.right = right.left;
         right.left = r_pos;
 
-        file.seekp(node_pos);
+        SEEK_ALL(file, node_pos);
         file << right;
-        file.seekp(r_pos);
+
+        SEEK_ALL(file, r_pos);
         file << node;
-        file.close();
 
         update_height(r_pos, node);
         update_height(node_pos, right);
@@ -328,21 +318,21 @@ private:
 //        return not_reallocate;
 //    }
 
-    Node<KeyType> find_successor(long right_ref) {
-        Node<KeyType> node;
-
-        file.seekg(right_ref);
-        file >> node;
-        long leftmost = node.left;
-
-        while (leftmost != null) {
-            file.seekg(leftmost);
-            file >> node;
-            leftmost = node.left;
-        }
-
-        return node;
-    }
+//    Node<KeyType> find_successor(long right_ref) {
+//        Node<KeyType> node;
+//
+//        file.seekg(right_ref);
+//        file >> node;
+//        long leftmost = node.left;
+//
+//        while (leftmost != null) {
+//            file.seekg(leftmost);
+//            file >> node;
+//            leftmost = node.left;
+//        }
+//
+//        return node;
+//    }
 
 public:
 
@@ -368,10 +358,11 @@ public:
     // that stores all the records in a `heap file`.
     explicit AVLFile(const std::string &heap_file_name, std::string index_file_name, Index _index, Greater _greater)
             : root(null), index(_index), greater(_greater), file_name(std::move(index_file_name)) {
-        file.open(file_name, std::ios::out | std::ios::binary);
         std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
-        RecordType record;
+        file.open(file_name, std::ios::out | std::ios::binary);
+        file.close();
 
+        RecordType record;
         long seek = 0;
         while (heap_file.read((char *) &record, sizeof(RecordType))) {
             if (!record.removed) {
@@ -381,7 +372,6 @@ public:
         }
 
         heap_file.close();
-        file.close();
     }
 
     ~AVLFile() = default;
@@ -411,11 +401,15 @@ public:
     }
 
     void insert(KeyType key, long pointer) {
-        long inserted_position = this->insert(this->root, key, pointer);
+        file.open(file_name, flags);
+        long inserted_position = this->insert(root, key, pointer);
+        file.close();
+
         root = ((root == null) ? inserted_position : root);
     }
 
 //    void remove(KeyType key) {
+//
 //        int root_removed = this->remove(this->root, key);
 //        root = (root_removed == null) ? null : root;
 //    }
