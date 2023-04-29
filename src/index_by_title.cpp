@@ -4,7 +4,6 @@
 
 #include "../inc/avl.hpp"
 #include "../inc/record.hpp"
-#include "../inc/utils.hpp"
 
 int main() {
     std::string heap_file = "./database/movies_and_series.dat";
@@ -17,12 +16,9 @@ int main() {
 
     AVLFile<char[256], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index, greater);
 
-//    avl.queued_report();
     char to_search[256];
-
     std::cout << "Enter the movie title: ";
     func::read_buffer(to_search, 256);
-
     for (MovieRecord& record : avl.search(to_search, heap_file)) {
         std::cout << record.to_string() << std::endl;
     }

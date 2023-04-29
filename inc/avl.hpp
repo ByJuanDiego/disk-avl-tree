@@ -13,9 +13,6 @@
     file.seekg(pos, relative);                 \
     file.seekp(pos, relative);
 
-#define DETACH (-2)
-#define NOT_DETACH (-3)
-
 #include <functional>
 #include <iostream>
 #include <fstream>

@@ -12,6 +12,9 @@
 /// nullptr file representation
 #define DISK_NULL (-1)
 #define INITIAL_RECORD (0)
+// for remove method purposes
+#define DETACH (-2)
+#define NOT_DETACH (-3)
 
 template<typename KeyType>
 struct Node {
@@ -29,7 +32,7 @@ struct Node {
     }
 
     Node<KeyType> &operator=(const Node<KeyType> &other) {
-        key = other.key;
+        func::copy(key, other.key);
         next = other.next;
         data_pointer = other.data_pointer;
         return *this;
