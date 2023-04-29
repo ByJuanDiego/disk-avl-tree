@@ -19,14 +19,17 @@ struct MovieRecord {
     int gross{};
     char certificate[16]{'\0'};
     char description[512]{'\0'};
-    bool removed{};
+
+    //--------------
+    bool removed{}; //< This member variable cannot be indexed!
+    //--------------
 
     std::string to_string() {
         std::stringstream ss;
         ss << "("
            << dataId << ", " << contentType << ", " << title << ", " << length << ", " << releaseYear << ", "
            << endYear << ", " << votes << ", " << rating << ", " << gross << ", " << certificate
-           << ", " << std::boolalpha << removed << ")";
+           << ", " << description << ", " << std::boolalpha << removed << ")";
         return ss.str();
     }
 };

@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <cstring>
 
 #include "../inc/record.hpp"
 
@@ -12,8 +13,7 @@ int main() {
     std::ifstream file("./database/movies_and_series.dat", std::ios::in | std::ios::binary);
 
     while (file.read((char *) &record, sizeof(MovieRecord))) {
-        if (record.removed)
-            std::cout << record.to_string() << std::endl;
+        std::cout << record.description << std::endl;
     }
 
     file.close();

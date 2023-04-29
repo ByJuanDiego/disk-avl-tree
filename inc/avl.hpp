@@ -408,8 +408,7 @@ public:
         long seek = 0;
         while (heap_file.read((char *) &record, sizeof(RecordType))) {
             if (!record.removed) {
-                KeyType key = index(record);
-                this->insert(key, seek);
+                this->insert(index(record), seek);
             }
             seek = heap_file.tellg();
         }
