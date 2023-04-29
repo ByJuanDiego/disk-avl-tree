@@ -33,9 +33,8 @@ namespace func {
         std::getline(std::cin >> std::ws, temp, '\n');
         std::cin.clear();
 
-        int sz = std::min((int) temp.length(), size);
-        for (int i = 0; i < sz; ++i) {
-            buffer[i] = temp[i];
+        for (int i = 0; i < size; ++i) {
+            buffer[i] = (i < temp.size())? temp[i] : '\0';
         }
 
         buffer[size - 1] = '\0';

@@ -477,32 +477,31 @@ public:
     void queued_report() {
         file.open(file_name, flags);
         Node<KeyType> input_node;
-        file.seekg(0);
+        SEEK_ALL(file, INITIAL_RECORD)
 
         if (!(file >> input_node)) {
             throw std::runtime_error("No records to display");
         }
 
         std::queue<std::pair<long, Node<KeyType>>> queue;
-        queue.push({0, input_node});
+        queue.push({INITIAL_RECORD, input_node});
 
         while (!queue.empty()) {
-            auto &[pos, node] = queue.front();
+            auto front = queue.front();
             queue.pop();
+            
+            std::cout << "[" << front.first << "]: " << front.second.to_string() << std::endl;
 
-            std::cout << "[" << pos << "]: " << node.to_string() << std::endl;
-
-            if (node.left != DISK_NULL) {
-                file.seekg(node.left);
-                file >> input_node;
-                queue.push({node.left, input_node});
-
+            Node<KeyType> node;
+            if (front.second.left != DISK_NULL) {
+                SEEK_ALL(file, front.second.left)
+                (file >> node);
+                queue.push({front.second.left, node});
             }
-
             if (node.right != DISK_NULL) {
-                file.seekg(node.right);
-                file >> input_node;
-                queue.push({node.right, input_node});
+                SEEK_ALL(file, front.second.right);
+                (file >> node);
+                queue.push({front.second.right, node});
             }
         }
 
