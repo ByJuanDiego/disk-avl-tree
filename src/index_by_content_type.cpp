@@ -18,9 +18,10 @@ int main() {
     };
 
     AVLFile<char[16], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index, greater);
-    avl.queued_report();
 
-    char to_search[16] = "movie"; //< Muchos registros
+    char to_search[16];
+    std::cout << "Enter the content type: ";
+    func::read_buffer(to_search, 16);
     for (MovieRecord& record : avl.search(to_search, heap_file)) {
         std::cout << record.to_string() << std::endl;
     }

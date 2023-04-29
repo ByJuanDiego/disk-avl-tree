@@ -13,7 +13,9 @@ int main() {
     std::ifstream file("./database/movies_and_series.dat", std::ios::in | std::ios::binary);
 
     while (file.read((char *) &record, sizeof(MovieRecord))) {
-        std::cout << record.description << std::endl;
+        if (record.votes == -1) {
+            std::cout << record.to_string() << std::endl;
+        }
     }
 
     file.close();

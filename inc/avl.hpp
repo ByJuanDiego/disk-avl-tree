@@ -495,7 +495,7 @@ public:
                 (file >> node);
                 queue.push({front.second.left, node});
             }
-            if (node.right != DISK_NULL) {
+            if (front.second.right != DISK_NULL) {
                 SEEK_ALL(file, front.second.right);
                 (file >> node);
                 queue.push({front.second.right, node});

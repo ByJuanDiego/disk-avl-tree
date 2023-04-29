@@ -12,7 +12,9 @@ int main() {
     std::function<short(MovieRecord &)> index = [](MovieRecord &movie) { return movie.endYear; };
     AVLFile<short, MovieRecord> avl(heap_file, index_file, false, index);
 
-    short to_search = 1950;
+    short to_search;
+    std::cout << "Enter the movie end year: ";
+    std::cin >> to_search;
     for (MovieRecord &record: avl.search(to_search, heap_file)) {
         std::cout << record.to_string() << std::endl;
     }
