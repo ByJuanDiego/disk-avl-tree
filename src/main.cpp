@@ -121,16 +121,18 @@ int main() {
     manager.create_index("endYear");
     manager.create_index("length");
 
+//    std::any to_delete = (short)1895;
+//    manager.remove("releaseYear", to_delete);
+
     std::any to_search;
     std::vector<MovieRecord> result;
-
     to_search = short(1895);
     result = manager.search("releaseYear", to_search);
     for (MovieRecord &movie: result) {
         std::cout << movie.to_string() << std::endl;
     }
 
-//    std::cout << std::string(100, '#') << std::endl;
+//    std::cout << std::string(140, '#') << std::endl;
 //    to_search = short(1996);
 //    result = manager.search("endYear", to_search);
 //    for (MovieRecord &movie: result) {
@@ -138,7 +140,6 @@ int main() {
 //    }
 
     std::cout << std::string(140, '#') << std::endl;
-
     to_search = short(7);
     result = manager.search("length", to_search);
     for (MovieRecord &movie: result) {

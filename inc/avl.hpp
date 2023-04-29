@@ -300,6 +300,10 @@ private:
             }
         } else {
             if (node.left == DISK_NULL && node.right == DISK_NULL) {
+                if (pointers.empty()) {
+                    push_all(node_pos, pointers);
+                }
+
                 return DETACH;
             } else if (node.left != DISK_NULL && node.right == DISK_NULL) {
                 if (pointers.empty()) {
