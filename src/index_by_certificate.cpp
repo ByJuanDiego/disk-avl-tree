@@ -14,7 +14,8 @@ int main() {
         return std::string(a) > std::string(b);
     };
 
-    AVLFile<char[16], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index, greater);
+    AVLFile<char[16], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index,
+                                                                           greater);
 
     char to_search[16];
     std::cout << "Enter the certificate: ";

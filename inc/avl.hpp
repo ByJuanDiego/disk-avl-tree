@@ -29,7 +29,7 @@ template<
         typename Greater = std::greater<KeyType>
 >
 class AVLFile {
-private:
+private: // Member variables
 
     long root;              //< Physical position of the first node
     bool primary_key;       //< Is `true` when indexing a primary key and `false` otherwise
@@ -43,128 +43,22 @@ private:
     Index index;            //< Receives a `RecordType` and returns his `KeyType` associated
     Greater greater;        //< Returns `true` if the first parameter is greater than the second and `false` otherwise
 
-    /*******************************************************************************
-    * Finds the record(s) associated to the `key`                                  *
-    *                                                                              *
-    * Recursively descends the tree until the record is found or a DISK_NULL node       *
-    * is reached; in that case, a exception is thrown                              *
-    ********************************************************************************/
-    void search(long record_pos, KeyType key, std::vector<long> &pointers) {
-        /* Base case (I): If this condition is true, it means that the `key` do not exist. */
-        if (record_pos == DISK_NULL) {
-            return;
-        }
 
-        /* Recursion: Searches the node to descend in depth */
-        Node<KeyType> node;
-        file.seekg(record_pos);
-        file >> node;
+private: // Secondary helper functions related to "avl-balancing", "remove-find-successor" and "push-all-pointers"
 
-        if (greater(node.key, key)) {
-            this->search(node.left, key, pointers);
-            return;
-        } else if (greater(key, node.key)) {
-            this->search(node.right, key, pointers);
-            return;
-        }
-
-        /* Base case (II): When this part is reached, it means that the node was found. */
-        pointers.push_back(node.data_pointer); //< Puts the data pointer in the vector
-
-        //< If the tree is indexing a primary key, algorithm finishes here.
-        if (primary_key) {
-            return;
-        }
-
-        // If not, looks for all the siblings of the node and includes them in the search.
-        long next = node.next;
-        while (next != DISK_NULL) {
-            file.seekg(node.next);
-            file >> node;
-            pointers.push_back(node.data_pointer);
-            next = node.next;
-        }
-    }
-
-    /*******************************************************************************
-    * Inserts a new record in the disk file.                                       *
-    *                                                                              *
-    * Descends the tree until a DISK_NULL node is reached in order to put the new       *
-    * record information at the end of the file and recursively reassign the       *
-    * father physical pointer.                                                     *
-    ********************************************************************************/
-    long insert(long node_pos, KeyType key, long pointer) {
-        /* Base case (I): If this condition is true, a place for the new record was found. */
-        if (node_pos == DISK_NULL) {
-            // Creates the node and open the file in append mode
-            Node<KeyType> node(key, pointer);
-            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
-            long insertion_position = file.tellp();
-            file << node;
-            // Returns the insertion position to the immediate previous state to reassign the physical pointer
-            return insertion_position;
-        }
-
-        /* Recursion: Searches the node to descend to insert */
-        Node<KeyType> node;
-        SEEK_ALL(file, node_pos)
-        file >> node;
-
-        long inserted_pos;
-        if (greater(node.key, key)) {
-            inserted_pos = insert(node.left, key, pointer);
-
-            if (node.left == DISK_NULL) {
-                node.left = inserted_pos;
-            }
-        } else if (greater(key, node.key)) {
-            inserted_pos = insert(node.right, key, pointer);
-
-            if (node.right == DISK_NULL) {
-                node.right = inserted_pos;
-            }
-        }
-            /* Base case (II): If `else` is reached, a node with the same key was found */
-        else {
-            // If the tree is indexing a primary key, an exception is thrown
-            if (primary_key) {
-                std::stringstream ss;
-                ss << "Repeated primary key: " << key;
-                file.close();
-                throw std::runtime_error(ss.str());
-            }
-
-            // If not, the repeated-key new record is stored next to `node` (LIFO).
-            // Append the new record at the end of the file and store the `insertion_pos`
-            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
-            Node<KeyType> insertion_node(key, pointer); //< The node to be inserted
-            insertion_node.next = node.next;            //< Moves the pointer to the new record node
-            long insertion_pos = file.tellp();          //< Stores the position where the new record begins
-            file << insertion_node;                     //< Inserts the record
-
+    /// Pushes in `pointers` all the `data_pointers` related to the same key (multi-value behavior)
+    /// If the tree is indexing a non-repeatable key, enters to the iteration just once.
+    inline void push_all(long node_pos, std::vector<long> &pointers) {
+        while (node_pos != DISK_NULL) {
+            Node<KeyType> current;
             SEEK_ALL(file, node_pos)
-            node.next = insertion_pos;                  //< Update the new `next`
-            file << node;                               //< Writes the last node new pointer
-
-            return EXIT_SUCCESS;                        //< Not tree balancing is needed when inserting a repeated key
+            file >> current;
+            pointers.push_back(current.data_pointer);
+            node_pos = current.next;
         }
-
-        /*******************************************************************************
-        * AVL behaviour.                                                               *
-        *                                                                              *
-        * Note that both actions below are done recursively while the recursion        *
-        * goes up from the most depth state to the first call.                         *
-        ********************************************************************************/
-
-        // First updates the height of the current node.
-        update_height(node_pos, node);
-        // After ensure the correctness of the subtree nodes heights, `balance` takes place
-        balance(node_pos, node);
-
-        return EXIT_SUCCESS; //< After reading this line, the algorithm goes to the previous state
     }
 
-    //< Seeks and returns the height of the node located at `record_pos`
+    /// Seeks and returns the height of the node located at `record_pos`
     long height(long record_pos) {
         // If the record position is DISK_NULL, then his height is -1 (empty node)
         if (record_pos == DISK_NULL) {
@@ -270,6 +164,130 @@ private:
         update_height(node_pos, right);
     }
 
+    /// Helper function for `remove`.
+    /// Is only called when the node to delete has both left and right sub-trees.
+    /// This helper function receives the `node.right` pointer and goes to his leftmost child (the successor).
+    Node<KeyType> find_successor(long right_ref) {
+        Node<KeyType> node;
+
+        SEEK_ALL(file, right_ref)
+        file >> node;
+        long leftmost = node.left;
+
+        while (leftmost != DISK_NULL) {
+            file.seekg(leftmost);
+            file >> node;
+            leftmost = node.left;
+        }
+
+        return node;
+    }
+
+private: // Recursive main helper functions: search, insert, remove and range-search
+
+    /*******************************************************************************
+    * Descends the tree until the record is found or a DISK_NULL node is reached   *
+    ********************************************************************************/
+    void search(long node_pos, KeyType key, std::vector<long> &pointers) {
+        /* Base case (I): If this condition is true, it means that the `key` do not exist. */
+        if (node_pos == DISK_NULL) {
+            return;
+        }
+
+        /* Recursion: Searches the node to descend in depth */
+        Node<KeyType> node;
+        file.seekg(node_pos);
+        file >> node;
+
+        if (greater(node.key, key)) {
+            this->search(node.left, key, pointers);
+            return;
+        } else if (greater(key, node.key)) {
+            this->search(node.right, key, pointers);
+            return;
+        }
+
+        /* Base case (II): When this part is reached, it means that the node was found. */
+        push_all(node_pos, pointers);
+    }
+
+    /*******************************************************************************
+    * Descends the tree until a DISK_NULL node is reached in order to put the new  *
+    * record information at the end of the file and recursively reassign the       *
+    * father physical pointer.                                                     *
+    ********************************************************************************/
+    long insert(long node_pos, KeyType key, long pointer) {
+        /* Base case (I): If this condition is true, a place for the new record was found. */
+        if (node_pos == DISK_NULL) {
+            // Creates the node and open the file in append mode
+            Node<KeyType> node(key, pointer);
+            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
+            long insertion_position = file.tellp();
+            file << node;
+            // Returns the insertion position to the immediate previous state to reassign the physical pointer
+            return insertion_position;
+        }
+
+        /* Recursion: Searches the node to descend to insert */
+        Node<KeyType> node;
+        SEEK_ALL(file, node_pos)
+        file >> node;
+
+        long inserted_pos;
+        if (greater(node.key, key)) {
+            inserted_pos = insert(node.left, key, pointer);
+
+            if (node.left == DISK_NULL) {
+                node.left = inserted_pos;
+            }
+        } else if (greater(key, node.key)) {
+            inserted_pos = insert(node.right, key, pointer);
+
+            if (node.right == DISK_NULL) {
+                node.right = inserted_pos;
+            }
+        }
+        /* Base case (II): If `else` is reached, a node with the same key was found */
+        else {
+            // If the tree is indexing a primary key, an exception is thrown
+            if (primary_key) {
+                std::stringstream ss;
+                ss << "Repeated primary key: " << key;
+                file.close();
+                throw std::runtime_error(ss.str());
+            }
+
+            // If not, the repeated-key new record is stored next to `node` (LIFO).
+            // Append the new record at the end of the file and store the `insertion_pos`
+            SEEK_ALL_RELATIVE(file, 0, std::ios::end)
+            Node<KeyType> insertion_node(key, pointer); //< The node to be inserted
+            insertion_node.next = node.next;            //< Moves the pointer to the new record node
+            long insertion_pos = file.tellp();          //< Stores the position where the new record begins
+            file << insertion_node;                     //< Inserts the record
+
+            SEEK_ALL(file, node_pos)
+            node.next = insertion_pos;                  //< Update the new `next`
+            file << node;                               //< Writes the last node new pointer
+
+            return EXIT_SUCCESS;                        //< Not tree balancing is needed when inserting a repeated key
+        }
+
+        /*******************************************************************************
+        * AVL behaviour.                                                               *
+        *                                                                              *
+        * Note that both actions below are done recursively while the recursion        *
+        * goes up from the most depth state to the first call.                         *
+        ********************************************************************************/
+
+        // First updates the height of the current node.
+        update_height(node_pos, node);
+        // After ensure the correctness of the subtree nodes heights, `balance` takes place
+        balance(node_pos, node);
+
+        return EXIT_SUCCESS; //< After reading this line, the algorithm goes to the previous state
+    }
+
+
     int remove(long node_pos, KeyType key, std::vector<long> &pointers) {
         if (node_pos == DISK_NULL) {
             std::stringstream ss;
@@ -348,33 +366,26 @@ private:
         return NOT_DETACH;
     }
 
-    inline void push_all(long node_pos, std::vector<long> &pointers) {
-        while (node_pos != DISK_NULL) {
-            Node<KeyType> current;
-            SEEK_ALL(file, node_pos)
-            file >> current;
-            pointers.push_back(current.data_pointer);
-            if (primary_key) {
-                break;
-            }
-            node_pos = current.next;
+    void range_search(long node_pos, KeyType lower_bound, KeyType upper_bound, std::vector<long> &pointers) {
+        if (node_pos == DISK_NULL) {
+            return;
         }
-    }
 
-    Node<KeyType> find_successor(long right_ref) {
         Node<KeyType> node;
-
-        SEEK_ALL(file, right_ref)
+        file.seekg(node_pos);
         file >> node;
-        long leftmost = node.left;
 
-        while (leftmost != DISK_NULL) {
-            file.seekg(leftmost);
-            file >> node;
-            leftmost = node.left;
+        if (greater(node.key, lower_bound)) {
+            range_search(node.left, lower_bound, upper_bound, pointers);
         }
 
-        return node;
+        if (!greater(lower_bound, node.key) && !greater(node.key, upper_bound)) {
+            push_all(node_pos, pointers);
+        }
+
+        if (greater(upper_bound, node.key)) {
+            range_search(node.right, lower_bound, upper_bound, pointers);
+        }
     }
 
 public:
@@ -415,6 +426,9 @@ public:
 
     ~AVLFile() = default;
 
+    /*******************************************************************************
+    * Inserts a new pointer in the index file.                                     *
+    ********************************************************************************/
     void insert(KeyType key, long pointer) {
         file.open(file_name, flags);
         long inserted_position = this->insert(root, key, pointer);
@@ -423,6 +437,9 @@ public:
         root = ((root == DISK_NULL) ? inserted_position : root);
     }
 
+    /*******************************************************************************
+    * Finds the pointer(s) associated to the `key`.                                *
+    ********************************************************************************/
     std::vector<RecordType> search(KeyType key, const std::string &heap_file_name) {
         std::vector<long> pointers;
         file.open(file_name, std::ios::in | std::ios::binary);
@@ -447,6 +464,36 @@ public:
         return records;
     }
 
+    /*******************************************************************************
+    * Finds the pointer(s) such that lower_bound <= `node.key` <= upper_bound.     *
+    ********************************************************************************/
+    std::vector<RecordType> range_search(KeyType lower_bound, KeyType upper_bound, const std::string &heap_file_name) {
+        std::vector<long> pointers;
+        file.open(file_name, std::ios::in | std::ios::binary);
+        this->range_search(root, lower_bound, upper_bound, pointers);
+        file.close();
+
+        std::vector<RecordType> records;
+        records.reserve(pointers.size());
+
+        std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
+        for (long pointer: pointers) {
+            RecordType record;
+            heap_file.seekg(pointer);
+            heap_file.read((char *) &record, sizeof(RecordType));
+            if (record.removed) {
+                continue;
+            }
+            records.push_back(record);
+        }
+
+        heap_file.close();
+        return records;
+    }
+
+    /*******************************************************************************
+    * Removes logically all the pointers associated to the `key`                   *
+    ********************************************************************************/
     void remove(KeyType key, const std::string &heap_file_name) {
         std::vector<long> pointers;
         file.open(file_name, flags);
@@ -486,7 +533,7 @@ public:
         while (!queue.empty()) {
             auto front = queue.front();
             queue.pop();
-            
+
             std::cout << "[" << front.first << "]: " << front.second.to_string() << std::endl;
 
             Node<KeyType> node;

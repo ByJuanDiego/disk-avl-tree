@@ -12,10 +12,24 @@ int main() {
     std::function<short(MovieRecord &)> index = [](MovieRecord &movie) { return movie.releaseYear; };
     AVLFile<short, MovieRecord> avl(heap_file, index_file, false, index);
 
-    short to_search;
-    std::cout << "Enter the release year: ";
-    std::cin >> to_search;
-    for (MovieRecord &record: avl.search(to_search, heap_file)) {
-        std::cout << record.to_string() << std::endl;
+//    short to_search;
+//    std::cout << "Enter the release year: ";
+//    std::cin >> to_search;
+//    for (MovieRecord &record: avl.search(to_search, heap_file)) {
+//        std::cout << record.to_string() << std::endl;
+//    }
+
+    short lower_bound {};
+    short upper_bound {};
+    do {
+        std::cout << "lower bound: ";
+        std::cin >> lower_bound;
+        std::cout << "upper bound: ";
+        std::cin >> upper_bound;
+        std::cout << std::endl;
+    } while (upper_bound <= lower_bound);
+
+    for (MovieRecord &movie: avl.range_search(lower_bound, upper_bound, heap_file)) {
+        std::cout << movie.to_string() << std::endl;
     }
 }

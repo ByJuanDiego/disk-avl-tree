@@ -1,2 +1,9 @@
 ./.idea
 ./cmake-build-debug
+/.idea/.name
+/.idea/avl-file.iml
+/.idea/discord.xml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/workspace.xml
