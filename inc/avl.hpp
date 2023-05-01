@@ -58,16 +58,16 @@ private: // Secondary helper functions related to "avl-balancing", "remove-find-
         }
     }
 
-    /// Seeks and returns the height of the node located at `record_pos`
-    long height(long record_pos) {
+    /// Seeks and returns the height of the node located at `node_pos`
+    long height(long node_pos) {
         // If the record position is DISK_NULL, then his height is -1 (empty node)
-        if (record_pos == DISK_NULL) {
+        if (node_pos == DISK_NULL) {
             return -1;
         }
 
         // Reads the node information
         Node<KeyType> node{};
-        SEEK_ALL(file, record_pos);
+        SEEK_ALL(file, node_pos);
         file >> node;
 
         return node.height; //< Returns his height
@@ -413,7 +413,7 @@ public:
         file.close();
 
         RecordType record;
-        long seek = 0;
+        long seek = INITIAL_RECORD;
         while (heap_file.read((char *) &record, sizeof(RecordType))) {
             if (!record.removed) {
                 this->insert(index(record), seek);
@@ -520,15 +520,15 @@ public:
 
     void queued_report() {
         file.open(file_name, flags);
-        Node<KeyType> input_node;
+        Node<KeyType> root_node;
         SEEK_ALL(file, INITIAL_RECORD)
 
-        if (!(file >> input_node)) {
+        if (!(file >> root_node)) {
             throw std::runtime_error("No records to display");
         }
 
         std::queue<std::pair<long, Node<KeyType>>> queue;
-        queue.push({INITIAL_RECORD, input_node});
+        queue.push({INITIAL_RECORD, root_node});
 
         while (!queue.empty()) {
             auto front = queue.front();
