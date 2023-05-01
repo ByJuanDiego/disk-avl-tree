@@ -8,15 +8,21 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-
-/// Console clear command
-#if defined(_WIN32) || defined(_WIN64)
-inline const char * clear_console = "cls";
-#else
-inline const char *clear_console = "clear";
-#endif
+#include <chrono>
 
 namespace func {
+
+    struct clock {
+        template<typename Function, typename... Params>
+        void operator()(const Function &fun, const std::string &function_name, const Params &...params) {
+            std::cout << "Executing function " << function_name << "..." << std::endl;
+            const auto start = std::chrono::steady_clock::now();
+            fun(params...);
+            const auto end = std::chrono::steady_clock::now();
+            const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            std::cout << "Executed function " << function_name << " in " << duration << " microseconds." << std::endl;
+        }
+    };
 
     template<typename T>
     void copy(T &a, const T &b) {
@@ -39,7 +45,7 @@ namespace func {
         std::cin.clear();
 
         for (int i = 0; i < size; ++i) {
-            buffer[i] = (i < temp.size())? temp[i] : '\0';
+            buffer[i] = (i < temp.size()) ? temp[i] : '\0';
         }
 
         buffer[size - 1] = '\0';
