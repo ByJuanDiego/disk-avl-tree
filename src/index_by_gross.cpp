@@ -13,10 +13,10 @@ int main() {
     AVLFile<int, MovieRecord> avl(heap_file, index_file, false, index);
 
 
-    int to_search;
+    int gross;
     std::cout << "Enter the gross: ";
-    std::cin >> to_search;
-    for (MovieRecord &record: avl.search(to_search, heap_file)) {
+    std::cin >> gross;
+    for (MovieRecord &record: avl.search(gross)) {
         std::cout << record.to_string() << std::endl;
     }
 }

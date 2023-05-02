@@ -12,11 +12,11 @@ int main() {
     std::function<int(MovieRecord &)> index = [](MovieRecord &movie) { return movie.votes; };
     AVLFile<int, MovieRecord> avl(heap_file, index_file, false, index);
 
-    int to_search;
+    int votes;
     std::cout << "Enter the number of votes: ";
-    std::cin >> to_search;
+    std::cin >> votes;
 
-    for (MovieRecord &record: avl.search(to_search, heap_file)) {
+    for (MovieRecord &record: avl.search(votes)) {
         std::cout << record.to_string() << std::endl;
     }
 }

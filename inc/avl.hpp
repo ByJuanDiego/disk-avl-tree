@@ -37,6 +37,8 @@ private: // Member variables
     std::fstream file;      //< File object used to manage disk accesses
     std::string file_name;  //< File name
 
+    std::string heap_file_name;
+
     std::ios_base::openmode flags = (std::ios::out | std::ios::in | std::ios::binary);
 
     /* Generic purposes member variables */
@@ -390,24 +392,17 @@ private: // Recursive main helper functions: search, insert, remove and range-se
 
 public:
 
-    // This constructor creates the AVL index in disk, `heap_file_name` contains the path to the `crude data` file
-    // that stores all the records in a `heap file`.
-    explicit AVLFile(const std::string &heap_file_name, std::string index_file_name,
+    // Initializes all the member variables and, if the index exists, assigns the root with the initial record
+    explicit AVLFile(std::string heap_file_name, std::string index_file_name,
                      bool is_key, Index _index, Greater _greater = Greater())
-            : root(DISK_NULL), index(_index),
-              greater(_greater), primary_key(is_key),
-              file_name(std::move(index_file_name)) {
-
-        // Verifies if the index already exists
-        file.open(file_name, std::ios::app);
-        long size = file.tellp();
-        file.close();
-        if (size > 0) {
+            : root(DISK_NULL), index(_index), greater(_greater), primary_key(is_key),
+              file_name(std::move(index_file_name)), heap_file_name(std::move(heap_file_name)) {
+        if (*this) {
             root = INITIAL_RECORD;
-            return;
         }
+    }
 
-        // If not, then creates it
+    void create_index() {
         std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
         file.open(file_name, std::ios::out | std::ios::binary);
         file.close();
@@ -422,6 +417,13 @@ public:
         }
 
         heap_file.close();
+    }
+
+    explicit operator bool() {
+        file.open(file_name, std::ios::app);
+        long size = file.tellp();
+        file.close();
+        return (size > 0);
     }
 
     ~AVLFile() = default;
@@ -440,7 +442,7 @@ public:
     /*******************************************************************************
     * Finds the pointer(s) associated to the `key`.                                *
     ********************************************************************************/
-    std::vector<RecordType> search(KeyType key, const std::string &heap_file_name) {
+    std::vector<RecordType> search(KeyType key) {
         std::vector<long> pointers;
         file.open(file_name, std::ios::in | std::ios::binary);
         this->search(root, key, pointers);
@@ -467,7 +469,7 @@ public:
     /*******************************************************************************
     * Finds the pointer(s) such that lower_bound <= `node.key` <= upper_bound.     *
     ********************************************************************************/
-    std::vector<RecordType> range_search(KeyType lower_bound, KeyType upper_bound, const std::string &heap_file_name) {
+    std::vector<RecordType> range_search(KeyType lower_bound, KeyType upper_bound) {
         std::vector<long> pointers;
         file.open(file_name, std::ios::in | std::ios::binary);
         this->range_search(root, lower_bound, upper_bound, pointers);
@@ -494,7 +496,7 @@ public:
     /*******************************************************************************
     * Removes logically all the pointers associated to the `key`                   *
     ********************************************************************************/
-    void remove(KeyType key, const std::string &heap_file_name) {
+    void remove(KeyType key) {
         std::vector<long> pointers;
         file.open(file_name, flags);
         int detach_root = this->remove(this->root, key, pointers);
@@ -518,7 +520,7 @@ public:
         }
     }
 
-    void queued_report() {
+    void bfs() {
         file.open(file_name, flags);
         Node<KeyType> root_node;
         SEEK_ALL(file, INITIAL_RECORD)

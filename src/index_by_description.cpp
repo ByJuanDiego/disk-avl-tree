@@ -16,11 +16,11 @@ int main() {
 
     AVLFile<char[512], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index, greater);
 
-    char to_search[512];
+    char description[512];
     std::cout << "Enter the movie description: ";
-    func::read_buffer(to_search, 512);
+    func::read_buffer(description, 512);
 
-    for (MovieRecord &record: avl.search(to_search, heap_file)) {
+    for (MovieRecord &record: avl.search(description)) {
         std::cout << record.to_string() << std::endl;
     }
 }

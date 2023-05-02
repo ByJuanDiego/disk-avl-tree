@@ -14,21 +14,22 @@ int main() {
         return std::string(a) > std::string(b);
     };
 
-    AVLFile<char[16], MovieRecord, decltype(index), decltype(greater)> avl(heap_file, index_file, false, index,
-                                                                           greater);
+    AVLFile<char[16], MovieRecord, decltype(index), decltype(greater)> avl(
+            heap_file, index_file, false, index, greater
+    );
 
-    char to_search[16];
-    std::cout << "Enter the certificate: ";
-    func::read_buffer(to_search, 16);
-    for (MovieRecord& record : avl.search(to_search, heap_file)) {
-        std::cout << record.to_string() << std::endl;
+    if (!avl) {
+        std::cout << "This index do not exists" << std::endl;
+    } else {
+        char certificate[16];
+        std::cout << "Enter the certificate: ";
+        func::read_buffer(certificate, 16);
+        std::cout << "certificate: " << certificate << std::endl;
+
+        for (MovieRecord &record: avl.search(certificate)) {
+            std::cout << record.to_string() << std::endl;
+        }
     }
-
-//    char to_remove[16];
-//    std::cout << "Enter the certificate to remove: ";
-//    func::read_buffer(to_remove, 16);
-//    avl.remove(to_remove, heap_file);
-//    avl.queued_report();
 }
 
 /*

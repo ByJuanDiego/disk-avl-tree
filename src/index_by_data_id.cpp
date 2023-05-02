@@ -13,10 +13,10 @@ int main() {
     std::function<int(MovieRecord &)> index = [](MovieRecord &movie) { return movie.dataId; };
     AVLFile<int, MovieRecord> avl(heap_file, index_file, true, index); // The dataId is a Primary Key
 
-    int to_search;
+    int dataId;
     std::cout << "Enter the dataId: ";
-    std::cin >> to_search;
-    std::vector<MovieRecord> records = avl.search(to_search, heap_file);
+    std::cin >> dataId;
+    std::vector<MovieRecord> records = avl.search(dataId);
     for (MovieRecord &movie: records) {
         std::cout << movie.to_string() << std::endl;
     }

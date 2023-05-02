@@ -12,10 +12,10 @@ int main() {
     std::function<float(MovieRecord &)> index = [](MovieRecord &movie) { return movie.rating; };
     AVLFile<float, MovieRecord> avl(heap_file, index_file, false, index);
 
-    float to_search;
+    float rating;
     std::cout << "Enter the movie rating (float): ";
-    std::cin >> to_search;
-    for (MovieRecord &record: avl.search(to_search, heap_file)) {
+    std::cin >> rating;
+    for (MovieRecord &record: avl.search(rating)) {
         std::cout << record.to_string() << std::endl;
     }
 }
