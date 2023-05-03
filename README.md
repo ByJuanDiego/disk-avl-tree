@@ -42,6 +42,8 @@ key-based search, range-based search and remove.
 
 $n := Number \ of \ nodes \ in \ the \ AVL$
 
+$K := Average \ number \ of \ linked \ nodes \ in \ a \ AVL that allows repeated keys$
+
 If the AVL is indexing a primary or secondary key:
 
 
@@ -52,3 +54,13 @@ If the AVL is indexing a primary or secondary key:
 |                  ```remove(KeyType key)```                   | $\mathcal{O}(\log_2 n)$ |   Descends in the tree until the key is found; then, chooses the remove method given the node state (often makes rotations).    |
 | ```range_search(KeyType lower_bound, KeyType upper_bound)``` |    $\mathcal{O}(n)$     | Descends the tree searching for the nodes that haves keys in the range and prunes the recursion to visit only the needed nodes. |
 
+
+If the AVL is indexing any other field:
+
+
+|                       Member Function                        |         Performance         |                                                                                      Description                                                                                      |
+|:------------------------------------------------------------:|:---------------------------:|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+|                  ```insert(KeyType key)```                   |   $\mathcal{O}(\log_2 n)$   |                      Descends in the tree and inserts below a leaf node (often makes rotations). If the key is repeated, links the new node using `LIFO` method.                      |
+|                  ```search(KeyType key)```                   | $\mathcal{O}(\log_2 n + K)$ |                                          Descends in the tree until the key is found; then, iterates over the `linked list` of repeated keys                                          |
+|                  ```remove(KeyType key)```                   | $\mathcal{O}(\log_2 n + K)$ | Descends in the tree until the key is found. Then, removes logically each record in the `heap file`. Finally, chooses the remove method given the node state (often makes rotations). |
+| ```range_search(KeyType lower_bound, KeyType upper_bound)``` |    $\mathcal{O}(n * K)$     |                            Descends the tree searching for the nodes that haves keys in the range and prunes the recursion to visit only the needed nodes.                            |
