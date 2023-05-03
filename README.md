@@ -39,3 +39,16 @@ key-based search, range-based search and remove.
     - Removes (logically) all the records such that `index(record) = key` by marking all the `record.removed` as `true` and removing such nodes of the `AVL`.
 
 ## Algorithms Performance (In function of disk accesses)
+
+$n := Number \ of \ nodes \ in \ the \ AVL$
+
+If the AVL is indexing a primary or secondary key:
+
+
+|                       Member Function                        |       Performance       |                                                           Description                                                           |
+|:------------------------------------------------------------:|:-----------------------:|:-------------------------------------------------------------------------------------------------------------------------------:|
+|                  ```insert(KeyType key)```                   | $\mathcal{O}(\log_2 n)$ |                           Descends in the tree and inserts below a leaf node (often makes rotations).                           |
+|                  ```search(KeyType key)```                   | $\mathcal{O}(\log_2 n)$ |                                          Descends in the tree until the key is found.                                           |
+|                  ```remove(KeyType key)```                   | $\mathcal{O}(\log_2 n)$ |   Descends in the tree until the key is found; then, chooses the remove method given the node state (often makes rotations).    |
+| ```range_search(KeyType lower_bound, KeyType upper_bound)``` |    $\mathcal{O}(n)$     | Descends the tree searching for the nodes that haves keys in the range and prunes the recursion to visit only the needed nodes. |
+
