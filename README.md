@@ -42,7 +42,7 @@ key-based search, range-based search and remove.
 
 $n := Number \ of \ nodes \ in \ the \ AVL$
 
-$K := Average \ number \ of \ linked \ nodes \ in \ a \ AVL that allows repeated keys$
+$K := Average \ number \ of \ linked \ nodes \ in \ a \ AVL \ that \ allows \ repeated \ keys$
 
 If the AVL is indexing a primary or secondary key:
 
