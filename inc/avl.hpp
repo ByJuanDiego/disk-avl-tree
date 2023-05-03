@@ -390,6 +390,11 @@ private: // Recursive main helper functions: search, insert, remove and range-se
         }
     }
 
+    void _insert(KeyType key, long pointer) {
+        long inserted_position = this->insert(root, key, pointer);
+        root = ((root == DISK_NULL) ? inserted_position : root);
+    }
+
 public:
 
     // Initializes all the member variables and, if the index exists, assigns the root with the initial record
@@ -404,18 +409,18 @@ public:
 
     void create_index() {
         std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
-        file.open(file_name, std::ios::out | std::ios::binary);
-        file.close();
+        file.open(file_name, flags);
 
         RecordType record;
         long seek = INITIAL_RECORD;
         while (heap_file.read((char *) &record, sizeof(RecordType))) {
             if (!record.removed) {
-                this->insert(index(record), seek);
+                _insert(index(record), seek);
             }
             seek = heap_file.tellg();
         }
 
+        file.close();
         heap_file.close();
     }
 
@@ -433,10 +438,8 @@ public:
     ********************************************************************************/
     void insert(KeyType key, long pointer) {
         file.open(file_name, flags);
-        long inserted_position = this->insert(root, key, pointer);
+        _insert(key, pointer);
         file.close();
-
-        root = ((root == DISK_NULL) ? inserted_position : root);
     }
 
     /*******************************************************************************

@@ -12,8 +12,17 @@ int main() {
     std::function<short(MovieRecord &)> index = [](MovieRecord &movie) { return movie.releaseYear; };
     AVLFile<short, MovieRecord> avl(heap_file, index_file, false, index);
 
-    short lower_bound {};
-    short upper_bound {};
+    func::clock clock;
+    clock([&]() {
+        if (!avl) {
+            avl.create_index();
+        } else {
+            std::cout << "AVL Index is already created" << std::endl;
+        }
+    }, "Create AVL Index by release year");
+
+    short lower_bound{};
+    short upper_bound{};
     do {
         std::cout << "lower bound: ";
         std::cin >> lower_bound;

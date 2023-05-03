@@ -13,11 +13,26 @@ int main() {
     std::function<int(MovieRecord &)> index = [](MovieRecord &movie) { return movie.dataId; };
     AVLFile<int, MovieRecord> avl(heap_file, index_file, true, index); // The dataId is a Primary Key
 
-    int dataId;
-    std::cout << "Enter the dataId: ";
-    std::cin >> dataId;
-    std::vector<MovieRecord> records = avl.search(dataId);
-    for (MovieRecord &movie: records) {
+    func::clock clock;
+    clock([&](){
+        if (!avl) {
+            avl.create_index();
+        } else {
+            std::cout << "AVL Index already exists" << std::endl;
+        }
+    }, "Create AVL Index by data id");
+
+    int lower_bound{};
+    int upper_bound{};
+    do {
+        std::cout << "lower bound: ";
+        std::cin >> lower_bound;
+        std::cout << "upper bound: ";
+        std::cin >> upper_bound;
+        std::cout << std::endl;
+    } while (upper_bound <= lower_bound);
+
+    for (MovieRecord &movie: avl.range_search(lower_bound, upper_bound)) {
         std::cout << movie.to_string() << std::endl;
     }
 }
