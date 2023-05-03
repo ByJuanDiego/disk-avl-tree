@@ -408,8 +408,12 @@ public:
     }
 
     void create_index() {
-        std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
+        file.open(file_name, std::ios::out);
+        root = DISK_NULL;
+        file.close();
+
         file.open(file_name, flags);
+        std::fstream heap_file(heap_file_name, std::ios::in | std::ios::binary);
 
         RecordType record;
         long seek = INITIAL_RECORD;
