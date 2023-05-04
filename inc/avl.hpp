@@ -398,10 +398,13 @@ private: // Recursive main helper functions: search, insert, remove and range-se
 public:
 
     // Initializes all the member variables and, if the index exists, assigns the root with the initial record
-    explicit AVLFile(std::string heap_file_name, std::string index_file_name,
+    explicit AVLFile(const std::string& heap_file_name, const std::string& attribute,
                      bool is_key, Index _index, Greater _greater = Greater())
-            : root(DISK_NULL), index(_index), greater(_greater), primary_key(is_key),
-              file_name(std::move(index_file_name)), heap_file_name(std::move(heap_file_name)) {
+            : root(DISK_NULL), index(_index), greater(_greater), primary_key(is_key), heap_file_name(heap_file_name) {
+        file_name = heap_file_name + "_" + attribute + ".avl";
+        file.open(file_name, std::ios::app | std::ios::binary);
+        file.close();
+
         if (*this) {
             root = INITIAL_RECORD;
         }
