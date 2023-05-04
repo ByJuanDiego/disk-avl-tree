@@ -432,7 +432,7 @@ public:
     }
 
     explicit operator bool() {
-        file.open(file_name, std::ios::app);
+        file.open(file_name, std::ios::app | std::ios::ate);
         long size = file.tellp();
         file.close();
         return (size > 0);
